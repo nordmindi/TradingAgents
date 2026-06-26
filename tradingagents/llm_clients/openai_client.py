@@ -47,7 +47,7 @@ _PROVIDER_CONFIG = {
     "qwen": ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
     "glm": ("https://api.z.ai/api/paas/v4/", "ZHIPU_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
-    "ollama": ("http://localhost:11434/v1", None),
+    "ollama": (None, "OLLAMA_API_KEY"),  # Use env var for URL and API key
 }
 
 
@@ -78,13 +78,28 @@ class OpenAIClient(BaseLLMClient):
         # Provider-specific base URL and auth
         if self.provider in _PROVIDER_CONFIG:
             base_url, api_key_env = _PROVIDER_CONFIG[self.provider]
-            llm_kwargs["base_url"] = base_url
-            if api_key_env:
+            
+            if self.provider == "ollama":
+                # For Ollama, check for custom backend_url first, then env var
+                if self.base_url:
+                    llm_kwargs["base_url"] = self.base_url
+                else:
+                    # Try to get from OLLAMA_BASE_URL env var, fallback to localhost
+                    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+                    llm_kwargs["base_url"] = ollama_url
+                
+                # Get API key from env var
                 api_key = os.environ.get(api_key_env)
                 if api_key:
                     llm_kwargs["api_key"] = api_key
+                else:
+                    llm_kwargs["api_key"] = "ollama"
             else:
-                llm_kwargs["api_key"] = "ollama"
+                llm_kwargs["base_url"] = base_url
+                if api_key_env:
+                    api_key = os.environ.get(api_key_env)
+                    if api_key:
+                        llm_kwargs["api_key"] = api_key
         elif self.base_url:
             llm_kwargs["base_url"] = self.base_url
 
@@ -103,3 +118,4 @@ class OpenAIClient(BaseLLMClient):
     def validate_model(self) -> bool:
         """Validate model for the provider."""
         return validate_model(self.provider, self.model)
+
