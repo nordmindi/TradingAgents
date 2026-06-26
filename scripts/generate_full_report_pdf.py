@@ -88,6 +88,13 @@ class MarkdownPDFGenerator:
         self.pdf.add_title_page(ticker, date_str)
         self.colors = self.pdf.colors
 
+    def _strip_emojis(self, text):
+        """Remove emojis and other unicode characters not supported by helvetica font."""
+        if not isinstance(text, str):
+            return str(text)
+        # Remove emojis and other unicode characters outside basic ASCII range
+        return "".join(c for c in text if ord(c) < 256)
+
     def _get_status_color(self, text):
         t = text.upper()
         if any(w in t for w in ["BUY", "ACCUMULATE", "BULLISH", "OVERWEIGHT", "POSITIVE"]):
@@ -98,19 +105,23 @@ class MarkdownPDFGenerator:
 
     def draw_callout_box(self, title, text, status_text="INFO"):
         """Draws a professional wrapped callout box for Strategic Actions."""
+        # Remove unicode characters that aren't supported by helvetica
+        clean_text = self._strip_emojis(text)
+        clean_title = self._strip_emojis(title)
+        
         color = self._get_status_color(status_text)
         self.pdf.ln(5)
         
         # Calculate Height
         self.pdf.set_font('helvetica', '', 10)
         # Use multi_cell split_only to calculate height before drawing
-        lines = self.pdf.multi_cell(170, 6, text, split_only=True)
+        lines = self.pdf.multi_cell(self.pdf.content_width - 20, 6, clean_text, split_only=True)
         height = (len(lines) * 6) + 12
 
         curr_y = self.pdf.get_y()
         # Box background
         self.pdf.set_fill_color(252, 252, 252)
-        self.pdf.rect(15, curr_y, 180, height, 'F')
+        self.pdf.rect(15, curr_y, self.pdf.content_width, height, 'F')
         # Left Accent Border
         self.pdf.set_fill_color(*color)
         self.pdf.rect(15, curr_y, 2, height, 'F')
@@ -119,23 +130,24 @@ class MarkdownPDFGenerator:
         self.pdf.set_xy(20, curr_y + 3)
         self.pdf.set_font('helvetica', 'B', 9)
         self.pdf.set_text_color(*color)
-        self.pdf.cell(160, 5, title.upper(), ln=True)
+        self.pdf.cell(self.pdf.content_width - 20, 5, clean_title.upper(), ln=True)
         
         # Content
         self.pdf.set_x(20)
         self.pdf.set_font('helvetica', '', 10)
         self.pdf.set_text_color(*self.colors['text'])
-        self.pdf.multi_cell(self.pdf.content_width - 20, 6, text)
+        self.pdf.multi_cell(self.pdf.content_width - 20, 6, clean_text)
         self.pdf.ln(5)
 
     def add_highlights_page(self, md_text):
         # Extract metrics (same logic as before)
         metrics = {"Recommendation": "N/A", "Action": "N/A", "Target": "N/A", "Stop": "N/A", "Sentiment": "N/A"}
         for line in md_text.split('\n'):
-            if "Recommendation:" in line or "Rekommendation:" in line: metrics["Recommendation"] = line.split(":", 1)[1].strip().replace("**", "")
-            if "Action:" in line or "Åtgärd:" in line: metrics["Action"] = line.split(":", 1)[1].strip().replace("**", "")
-            if "Target Price:" in line or "Målkurs:" in line: metrics["Target"] = line.split(":", 1)[1].strip().replace("**", "")
-            if "Stop Loss:" in line: metrics["Stop"] = line.split(":", 1)[1].strip().replace("**", "")
+            clean_line = self._strip_emojis(line)
+            if "Recommendation:" in clean_line or "Rekommendation:" in clean_line: metrics["Recommendation"] = clean_line.split(":", 1)[1].strip().replace("**", "")
+            if "Action:" in clean_line or "Åtgärd:" in clean_line: metrics["Action"] = clean_line.split(":", 1)[1].strip().replace("**", "")
+            if "Target Price:" in clean_line or "Målkurs:" in clean_line: metrics["Target"] = clean_line.split(":", 1)[1].strip().replace("**", "")
+            if "Stop Loss:" in clean_line: metrics["Stop"] = clean_line.split(":", 1)[1].strip().replace("**", "")
 
         self.pdf.add_page()
         self.pdf.set_font('helvetica', 'B', 20)
@@ -184,9 +196,10 @@ class MarkdownPDFGenerator:
                 continue
 
             # Check for Table
-            if '|' in line and '---' not in line:
+            clean_line = self._strip_emojis(line)
+            if '|' in clean_line and '---' not in clean_line:
                 in_table = True
-                table_rows.append([p.strip() for p in line.split('|') if p.strip()])
+                table_rows.append([self._strip_emojis(p.strip()) for p in clean_line.split('|') if p.strip()])
                 continue
             elif in_table:
                 self._render_table(table_rows)
@@ -197,7 +210,8 @@ class MarkdownPDFGenerator:
                 self.pdf.ln(5)
                 self.pdf.set_font('helvetica', 'B', 14)
                 self.pdf.set_text_color(*self.colors['primary'])
-                self.pdf.multi_cell(self.pdf.content_width, 10, line[3:].upper())
+                clean_header = self._strip_emojis(line[3:].upper())
+                self.pdf.multi_cell(self.pdf.content_width, 10, clean_header)
                 self.pdf.set_draw_color(*self.colors['primary'])
                 self.pdf.line(15, self.pdf.get_y(), 60, self.pdf.get_y())
                 self.pdf.ln(3)
@@ -205,14 +219,18 @@ class MarkdownPDFGenerator:
             elif line.startswith('### '):
                 self.pdf.set_font('helvetica', 'B', 11)
                 self.pdf.set_text_color(*self.colors['text'])
-                self.pdf.multi_cell(self.pdf.content_width, 8, line[4:])
+                clean_subheader = self._strip_emojis(line[4:])
+                self.pdf.multi_cell(self.pdf.content_width, 8, clean_subheader)
                 
             # STRATEGIC ACTIONS HANDLING
             elif "Strategic Action" in line or "Action:" in line:
                 parts = line.split(":", 1)
                 title = parts[0].replace("**", "").strip()
                 content = parts[1].replace("**", "").strip()
-                self.draw_callout_box(title, content, status_text=content)
+                # Strip emojis from title and content
+                clean_title = self._strip_emojis(title)
+                clean_content = self._strip_emojis(content)
+                self.draw_callout_box(clean_title, clean_content, status_text=clean_content)
 
             # Bullet points
             elif line.startswith('- ') or line.startswith('* '):
@@ -223,20 +241,29 @@ class MarkdownPDFGenerator:
                 self.pdf.set_font('helvetica', 'B', 10)
                 self.pdf.text(16, self.pdf.get_y() + 4, ">")
                 self.pdf.set_font('helvetica', '', 10)
-                self.pdf.multi_cell(self.pdf.content_width - 20, 6, line[2:])
+                clean_bullet = self._strip_emojis(line[2:])
+                self.pdf.multi_cell(self.pdf.content_width - 20, 6, clean_bullet)
             
             # Regular Paragraphs
             else:
                 self.pdf.set_font('helvetica', '', 10)
                 self.pdf.set_text_color(*self.colors['text'])
                 clean_line = line.replace("**", "")
+                # Strip emojis and unsupported unicode characters
+                clean_line = self._strip_emojis(clean_line)
                 self.pdf.multi_cell(self.pdf.content_width, 6, clean_line)
 
     def _render_table(self, rows):
         if not rows: return
+        # Strip emojis from all table content
+        clean_rows = []
+        for row in rows:
+            clean_row = [self._strip_emojis(cell) for cell in row]
+            clean_rows.append(clean_row)
+        
         self.pdf.set_font("helvetica", "B", 9)
         with self.pdf.table(width=self.pdf.content_width, col_widths=None, text_align="LEFT", line_height=7) as table:
-            for i, row in enumerate(rows):
+            for i, row in enumerate(clean_rows):
                 r = table.row()
                 if i == 0: # Header
                     self.pdf.set_fill_color(*self.colors['surface_2'])
