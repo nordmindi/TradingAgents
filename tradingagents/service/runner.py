@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,6 +14,7 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.reporting import generate_pdf_from_markdown, save_report_to_disk
 
+logger = logging.getLogger(__name__)
 
 VALID_ANALYSTS = {"market", "social", "news", "fundamentals"}
 
@@ -95,6 +97,13 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
         if value is not None:
             config[key] = value
 
+    logger.debug(
+        f"Config built | Job: {job_id} | "
+        f"LLM: {config.get('llm_provider')} | "
+        f"Deep Think: {config.get('deep_think_llm')} | "
+        f"Quick Think: {config.get('quick_think_llm')}"
+    )
+
     return config
 
 
@@ -106,23 +115,39 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
 
     job_id = job_id or uuid4().hex
     ticker = request.ticker.strip().upper()
+    
+    logger.info(f"Building config | Job: {job_id} | Ticker: {ticker}")
     config = build_config(request, job_id)
 
+    logger.info(f"Initializing TradingAgentsGraph | Job: {job_id} | Analysts: {request.selected_analysts}")
     graph = TradingAgentsGraph(
         selected_analysts=list(request.selected_analysts),
         debug=False,
         config=config,
     )
-    final_state, decision = graph.propagate(ticker, request.analysis_date)
+    
+    logger.info(f"Starting propagation | Job: {job_id} | Ticker: {ticker} | Date: {request.analysis_date}")
+    try:
+        final_state, decision = graph.propagate(ticker, request.analysis_date)
+        logger.info(f"Propagation completed | Job: {job_id} | Decision: {decision}")
+    except Exception as exc:
+        logger.error(f"Propagation failed | Job: {job_id} | Error: {str(exc)}", exc_info=True)
+        raise
 
     report_root = Path(os.getenv("TRADINGAGENTS_SERVICE_REPORTS_DIR", "reports/api")).resolve()
     report_dir = report_root / job_id
+    
+    logger.info(f"Saving report to disk | Job: {job_id} | Directory: {report_dir}")
     markdown_path = save_report_to_disk(final_state, ticker, report_dir)
+    logger.info(f"Markdown report saved | Job: {job_id} | Path: {markdown_path}")
+    
+    logger.info(f"Generating PDF | Job: {job_id} | Ticker: {ticker}")
     pdf_path = generate_pdf_from_markdown(
         markdown_path,
         ticker,
         report_dir / f"TradingAgents_Report_{ticker}_{job_id}.pdf",
     )
+    logger.info(f"PDF generated | Job: {job_id} | Path: {pdf_path}")
 
     return ReportResult(
         job_id=job_id,
@@ -133,3 +158,4 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
         markdown_path=markdown_path,
         pdf_path=pdf_path,
     )
+
