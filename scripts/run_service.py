@@ -20,9 +20,10 @@ import uvicorn
 def main():
     """Run the TradingAgents service API."""
     # Set default environment variables if not provided
+    # Railway.com sets PORT environment variable
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
-    workers = int(os.getenv("WORKERS", "1"))
+    port = int(os.getenv("PORT", os.getenv("SERVICE_PORT", "8000")))
+    workers = int(os.getenv("WORKERS", os.getenv("TRADINGAGENTS_SERVICE_WORKERS", "1")))
     
     print(f"Starting TradingAgents service on {host}:{port}")
     print(f"Workers: {workers}")

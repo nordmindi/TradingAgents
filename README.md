@@ -104,7 +104,7 @@ Our framework decomposes complex trading tasks into specialized roles. This ensu
 
 Clone TradingAgents:
 ```bash
-git clone https://github.com/TauricResearch/TradingAgents.git
+git clone https://github.com/nordmindi/TradingAgents.git
 cd TradingAgents
 ```
 
@@ -179,6 +179,14 @@ An interface will appear showing results as they load, letting you track the age
 <p align="center">
   <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
+
+### Cloud Deployment
+
+TradingAgents can be deployed as a service in the cloud. See deployment guides for specific platforms:
+
+- [General Deployment Guide](DEPLOYMENT.md)
+- [Railway.com Deployment Guide](RAILWAY_DEPLOYMENT.md)
+- [Kubernetes Deployment Guide](k8s/README.md)
 
 ### Professional PDF Reporting
 
