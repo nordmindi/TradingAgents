@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import traceback
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
@@ -17,6 +19,13 @@ from tradingagents.service.runner import (
     ReportResult,
     run_report_job,
     validate_report_request,
+)
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
 
@@ -81,6 +90,9 @@ class JobRecord:
         self.result: ReportResult | None = None
         self.error: str | None = None
         self.future: Future[ReportResult] | None = None
+        self.created_at = datetime.now()
+        self.started_at: datetime | None = None
+        self.completed_at: datetime | None = None
 
 
 app = FastAPI(
@@ -96,6 +108,7 @@ jobs: dict[str, JobRecord] = {}
 def require_service_key(x_api_key: str | None = Header(default=None)) -> None:
     expected = os.getenv("TRADINGAGENTS_SERVICE_API_KEY")
     if expected and x_api_key != expected:
+        logger.warning("Invalid API key attempt")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid service API key",
@@ -104,26 +117,52 @@ def require_service_key(x_api_key: str | None = Header(default=None)) -> None:
 
 def _execute_job(record: JobRecord) -> ReportResult:
     record.status = JobStatus.running
+    record.started_at = datetime.now()
+    
+    logger.info(
+        f"Job {record.job_id} started | Ticker: {record.request.ticker} | "
+        f"Date: {record.request.analysis_date} | Analysts: {record.request.selected_analysts} | "
+        f"LLM: {record.request.llm_provider or 'default'}"
+    )
+    
     try:
         record.result = run_report_job(record.request, job_id=record.job_id)
         record.status = JobStatus.completed
+        record.completed_at = datetime.now()
+        duration = (record.completed_at - record.started_at).total_seconds()
+        
+        logger.info(
+            f"Job {record.job_id} completed successfully | "
+            f"Duration: {duration:.2f}s | Decision: {record.result.decision}"
+        )
         return record.result
     except Exception as exc:
         record.error = str(exc)
         record.status = JobStatus.failed
+        record.completed_at = datetime.now()
+        duration = (record.completed_at - record.started_at).total_seconds()
+        
+        logger.error(
+            f"Job {record.job_id} failed | Duration: {duration:.2f}s | "
+            f"Error: {record.error}",
+            exc_info=True,
+        )
         raise
 
 
 def _get_job(job_id: str) -> JobRecord:
     record = jobs.get(job_id)
     if record is None:
+        logger.warning(f"Job {job_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
     return record
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    active_jobs = sum(1 for j in jobs.values() if j.status == JobStatus.running)
+    logger.debug(f"Health check | Active jobs: {active_jobs} | Total jobs: {len(jobs)}")
+    return {"status": "ok", "active_jobs": active_jobs, "total_jobs": len(jobs)}
 
 
 @app.post(
@@ -135,6 +174,12 @@ def health() -> dict[str, str]:
 def create_report(payload: CreateReportRequest) -> CreateReportResponse:
     analysis_date = payload.analysis_date or datetime.now().strftime("%Y-%m-%d")
     job_id = uuid4().hex
+    
+    logger.info(
+        f"Creating job {job_id} | Ticker: {payload.ticker} | "
+        f"Date: {analysis_date} | Analysts: {payload.selected_analysts}"
+    )
+    
     request = ReportRequest(
         ticker=payload.ticker,
         analysis_date=analysis_date,
@@ -152,6 +197,7 @@ def create_report(payload: CreateReportRequest) -> CreateReportResponse:
     try:
         validate_report_request(request)
     except ValueError as exc:
+        logger.error(f"Job {job_id} validation failed: {str(exc)}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
@@ -160,6 +206,8 @@ def create_report(payload: CreateReportRequest) -> CreateReportResponse:
     record = JobRecord(job_id, request)
     jobs[job_id] = record
     record.future = executor.submit(_execute_job, record)
+    
+    logger.info(f"Job {job_id} queued successfully")
 
     return CreateReportResponse(
         job_id=job_id,
@@ -177,6 +225,9 @@ def create_report(payload: CreateReportRequest) -> CreateReportResponse:
 def get_report(job_id: str) -> ReportJobResponse:
     record = _get_job(job_id)
     result = record.result
+    
+    logger.debug(f"Fetching job status | Job: {job_id} | Status: {record.status}")
+    
     return ReportJobResponse(
         job_id=record.job_id,
         status=record.status,
@@ -194,6 +245,9 @@ def get_report(job_id: str) -> ReportJobResponse:
 def download_report_pdf(job_id: str) -> FileResponse:
     record = _get_job(job_id)
     if record.status != JobStatus.completed or record.result is None:
+        logger.warning(
+            f"PDF download attempted for incomplete job | Job: {job_id} | Status: {record.status}"
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"job is {record.status}",
@@ -201,13 +255,16 @@ def download_report_pdf(job_id: str) -> FileResponse:
 
     pdf_path = Path(record.result.pdf_path)
     if not pdf_path.exists():
+        logger.error(f"PDF file not found | Job: {job_id} | Path: {pdf_path}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="pdf not found",
         )
 
+    logger.info(f"Downloading PDF | Job: {job_id} | File: {pdf_path.name}")
     return FileResponse(
         pdf_path,
         media_type="application/pdf",
         filename=pdf_path.name,
     )
+
