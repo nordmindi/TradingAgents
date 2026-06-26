@@ -10,16 +10,16 @@ class VeinReportPDF(FPDF):
         super().__init__(orientation, unit, format)
         # Vein brand colors from design system
         self.colors = {
-            'background': (43, 50, 64),      # graphite ink - dark: 0.17 0.012 250
-            'surface': (54, 64, 82),         # surface - dark: 0.21 0.014 250
-            'surface_2': (64, 76, 97),       # surface raised - dark: 0.25 0.015 250
-            'border': (77, 92, 117),         # border - dark: 0.30 0.015 250
-            'text': (243, 244, 246),         # text - dark: 0.95 0.005 250
-            'text_muted': (178, 186, 194),   # text muted - dark: 0.70 0.012 250
+            'background': (255, 255, 255),   # White background for better readability
+            'surface': (248, 250, 252),      # Light surface - for dashboard boxes
+            'surface_2': (240, 244, 255),    # Lighter surface - for table headers
+            'border': (226, 232, 240),       # Light border - for subtle separation
+            'text': (30, 41, 59),            # Dark text - high contrast on white
+            'text_muted': (100, 116, 139),   # Muted text - for secondary information
             'primary': (85, 166, 245),       # "Azimuth" azure - dark: 0.66 0.16 245
-            'tradeable': (85, 220, 180),     # tradeable/emerald - dark: 0.72 0.15 158
-            'chokepoint': (255, 120, 120),   # chokepoint/coral - dark: 0.64 0.20 25
-            'warning': (255, 190, 85),       # warning/amber - dark: 0.78 0.14 75
+            'tradeable': (16, 185, 129),     # emerald green - from design system
+            'chokepoint': (239, 68, 68),     # coral red - from design system
+            'warning': (245, 158, 11),       # amber - from design system
             'white': (255, 255, 255),
             'black': (0, 0, 0)
         }
@@ -28,8 +28,8 @@ class VeinReportPDF(FPDF):
         if self.page_no() == 1:
             return # No header on title page
             
-        # Brand Header Bar - using Vein's graphite ink background
-        self.set_fill_color(*self.colors['background'])
+        # Brand Header Bar - using Vein's primary azure background
+        self.set_fill_color(*self.colors['primary'])
         self.rect(0, 0, 210, 35, 'F')
         
         self.set_xy(10, 10)
@@ -44,7 +44,7 @@ class VeinReportPDF(FPDF):
         # Right-aligned Page Number in header
         self.set_xy(170, 10)
         self.set_font('helvetica', '', 8)
-        self.set_text_color(*self.colors['text_muted'])
+        self.set_text_color(*self.colors['white'])
         self.cell(30, 10, f'REPORT | PAGE {self.page_no()}', ln=True, align='R')
         
         self.set_y(40) # Reset Y to below header
@@ -60,8 +60,8 @@ class VeinReportPDF(FPDF):
         
     def add_title_page(self, ticker, date_str):
         self.add_page()
-        # Background color for title page - using Vein's graphite ink
-        self.set_fill_color(*self.colors['background'])
+        # Background color for title page - using white background
+        self.set_fill_color(*self.colors['white'])
         self.rect(0, 0, 210, 297, 'F')
         
         # Decorative Elements - using Vein's primary azure color
@@ -72,7 +72,7 @@ class VeinReportPDF(FPDF):
         
         # Center Content
         self.set_y(100)
-        self.set_text_color(*self.colors['white'])
+        self.set_text_color(*self.colors['text'])
         self.set_font('helvetica', 'B', 40)
         self.cell(0, 20, 'SUPPLY CHAIN INTELLIGENCE', ln=True, align='C')
         
@@ -81,7 +81,7 @@ class VeinReportPDF(FPDF):
         self.cell(0, 20, f'TICKER: {ticker}', ln=True, align='C')
         
         self.set_y(200)
-        self.set_text_color(*self.colors['white'])
+        self.set_text_color(*self.colors['text'])
         self.set_font('helvetica', '', 14)
         self.cell(0, 10, f'Analysis Date: {date_str}', ln=True, align='C')
         self.cell(0, 10, 'Compiled by Vein AI Framework', ln=True, align='C')
@@ -158,7 +158,7 @@ class MarkdownPDFGenerator:
             y = start_y + (i // 2) * 35
             
             # Box - using Vein's surface and border colors
-            self.pdf.set_fill_color(*self.colors['surface_2'])
+            self.pdf.set_fill_color(*self.colors['surface'])
             self.pdf.rect(x, y, col_w, 30, 'F')
             self.pdf.set_draw_color(*self.colors['border'])
             self.pdf.rect(x, y, col_w, 30, 'D')
