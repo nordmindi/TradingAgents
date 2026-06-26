@@ -1,0 +1,474 @@
+{
+  "info": {
+    "_postman_id": "1f6f4dc2-7a43-4ae8-a83e-40e3d4d3955b",
+    "name": "TradingAgents Service API",
+    "description": "Requests for testing the TradingAgents FastAPI service. Set base_url and api_key collection variables before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Checks that the service is running."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Accepted\", function () {",
+              "  pm.expect(pm.response.code).to.eql(202);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json.job_id) {",
+              "  pm.collectionVariables.set(\"job_id\", json.job_id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"NVDA\",\n  \"analysis_date\": \"2026-05-07\",\n  \"selected_analysts\": [\"market\", \"news\", \"fundamentals\"],\n  \"llm_provider\": \"openai\",\n  \"deep_think_llm\": \"gpt-5.4\",\n  \"quick_think_llm\": \"gpt-5.4-mini\",\n  \"max_debate_rounds\": 1,\n  \"max_risk_discuss_rounds\": 1,\n  \"output_language\": \"English\",\n  \"user_id\": \"postman-test-user\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Creates an async report job. The test script stores job_id as a collection variable."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job - Minimal",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Accepted\", function () {",
+              "  pm.expect(pm.response.code).to.eql(202);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json.job_id) {",
+              "  pm.collectionVariables.set(\"job_id\", json.job_id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"AAPL\",\n  \"analysis_date\": \"2026-05-07\",\n  \"selected_analysts\": [\"market\"]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Creates a minimal report job with only required fields."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job - All Analysts",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Accepted\", function () {",
+              "  pm.expect(pm.response.code).to.eql(202);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json.job_id) {",
+              "  pm.collectionVariables.set(\"job_id\", json.job_id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"MSFT\",\n  \"analysis_date\": \"2026-05-07\",\n  \"selected_analysts\": [\"market\", \"social\", \"news\", \"fundamentals\"]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Creates a report job with all analyst types selected."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job - Invalid Ticker",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Bad Request\", function () {",
+              "  pm.expect(pm.response.code).to.eql(422);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"\",\n  \"analysis_date\": \"2026-05-07\",\n  \"selected_analysts\": [\"market\"]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Attempts to create a report job with an invalid (empty) ticker."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job - Invalid Date",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Bad Request\", function () {",
+              "  pm.expect(pm.response.code).to.eql(422);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"NVDA\",\n  \"analysis_date\": \"invalid-date\",\n  \"selected_analysts\": [\"market\"]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Attempts to create a report job with an invalid date format."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job - Future Date",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Bad Request\", function () {",
+              "  pm.expect(pm.response.code).to.eql(422);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"NVDA\",\n  \"analysis_date\": \"2027-01-01\",\n  \"selected_analysts\": [\"market\"]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Attempts to create a report job with a future date."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Report Job Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/reports/{{job_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports",
+            "{{job_id}}"
+          ]
+        },
+        "description": "Polls the job until status is completed or failed."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Report Job Status - Invalid Job ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Not Found\", function () {",
+              "  pm.expect(pm.response.code).to.eql(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/reports/invalid-job-id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports",
+            "invalid-job-id"
+          ]
+        },
+        "description": "Attempts to get status for a non-existent job ID."
+      },
+      "response": []
+    },
+    {
+      "name": "Download Report PDF",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/reports/{{job_id}}/pdf",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports",
+            "{{job_id}}",
+            "pdf"
+          ]
+        },
+        "description": "Downloads the completed report PDF. Returns 409 if the job is not complete yet."
+      },
+      "response": []
+    },
+    {
+      "name": "Download Report PDF - Invalid Job ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Not Found\", function () {",
+              "  pm.expect(pm.response.code).to.eql(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/reports/invalid-job-id/pdf",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports",
+            "invalid-job-id",
+            "pdf"
+          ]
+        },
+        "description": "Attempts to download PDF for a non-existent job ID."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "change-me-in-production",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

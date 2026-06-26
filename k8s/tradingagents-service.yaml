@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tradingagents
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tradingagents-config
+  namespace: tradingagents
+data:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  TRADINGAGENTS_SERVICE_WORKERS: "1"
+  TRADINGAGENTS_SERVICE_REPORTS_DIR: "/data/reports"
+  TRADINGAGENTS_SERVICE_CACHE_DIR: "/data/cache"
+  TRADINGAGENTS_SERVICE_MEMORY_DIR: "/data/memory"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tradingagents-service
+  namespace: tradingagents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tradingagents-service
+  template:
+    metadata:
+      labels:
+        app: tradingagents-service
+    spec:
+      containers:
+      - name: tradingagents-service
+        image: tradingagents/tradingagents:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: tradingagents-config
+        - secretRef:
+            name: tradingagents-secrets
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: tradingagents-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tradingagents-service
+  namespace: tradingagents
+spec:
+  selector:
+    app: tradingagents-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tradingagents-ingress
+  namespace: tradingagents
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: tradingagents.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tradingagents-service
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tradingagents-pvc
+  namespace: tradingagents
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

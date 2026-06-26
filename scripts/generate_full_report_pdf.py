@@ -1,0 +1,353 @@
+import os
+import sys
+import re
+from datetime import datetime
+from fpdf import FPDF
+import json
+
+class AnalystReportPDF(FPDF):
+    def header(self):
+        if self.page_no() == 1:
+            return # No header on title page
+            
+        # Brand Header Bar
+        self.set_fill_color(22, 27, 34) # Dark background
+        self.rect(0, 0, 210, 35, 'F')
+        
+        self.set_xy(10, 10)
+        self.set_text_color(255, 255, 255)
+        self.set_font('helvetica', 'B', 16)
+        self.cell(0, 10, 'BULLION ANALYTICS', ln=False, align='L')
+        
+        self.set_font('helvetica', 'I', 8)
+        self.set_xy(10, 18)
+        self.cell(0, 10, 'Premium Intelligence & Risk Assessment', ln=True, align='L')
+        
+        # Right-aligned Page Number in header
+        self.set_xy(170, 10)
+        self.set_font('helvetica', '', 8)
+        self.cell(30, 10, f'REPORT | PAGE {self.page_no()}', ln=True, align='R')
+        
+        self.set_y(40) # Reset Y to below header
+
+    def footer(self):
+        if self.page_no() == 1:
+            return # No footer on title page
+            
+        self.set_y(-15)
+        self.set_font('helvetica', 'I', 8)
+        self.set_text_color(128, 128, 128)
+        self.cell(0, 10, f'Proprietary & Confidential | Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}', align='C')
+        
+    def add_title_page(self, ticker, date_str):
+        self.add_page()
+        # Background color for title page
+        self.set_fill_color(22, 27, 34)
+        self.rect(0, 0, 210, 297, 'F')
+        
+        # Decorative Elements
+        self.set_draw_color(37, 99, 235)
+        self.set_line_width(1)
+        self.line(10, 10, 200, 10)
+        self.line(10, 287, 200, 287)
+        
+        # Center Content
+        self.set_y(100)
+        self.set_text_color(255, 255, 255)
+        self.set_font('helvetica', 'B', 40)
+        self.cell(0, 20, 'MARKET INTELLIGENCE', ln=True, align='C')
+        
+        self.set_font('helvetica', 'B', 24)
+        self.set_text_color(37, 99, 235) # Premium Blue
+        self.cell(0, 20, f'TICKER: {ticker}', ln=True, align='C')
+        
+        self.set_y(200)
+        self.set_text_color(255, 255, 255)
+        self.set_font('helvetica', '', 14)
+        self.cell(0, 10, f'Analysis Date: {date_str}', ln=True, align='C')
+        self.cell(0, 10, 'Compiled by Bullion Analytics AI Framework', ln=True, align='C')
+        
+        self.set_y(260)
+        self.set_draw_color(37, 99, 235)
+        self.line(40, self.get_y(), 170, self.get_y())
+        self.ln(5)
+        self.set_font('helvetica', 'I', 10)
+        self.cell(0, 10, 'CONFIDENTIAL - FOR AUTHORIZED USE ONLY', ln=True, align='C')
+
+class MarkdownPDFGenerator:
+    def __init__(self, ticker="UNKNOWN", date_str=""):
+        self.pdf = AnalystReportPDF()
+        self.pdf.set_auto_page_break(auto=True, margin=20)
+        self.pdf.add_title_page(ticker, date_str)
+        self.ticker = ticker
+        
+    def _strip_emojis(self, text):
+        return "".join(c for c in text if ord(c) < 256)
+
+    def _get_status_color(self, text):
+        text = text.upper()
+        # Harmonized with official Bullion Analytics colors
+        if any(word in text for word in ["BUY", "KÖP", "STRONG BUY", "ACCUMULATE", "BULLISH", "POSITIVE", "UPGRADE"]):
+            return (16, 185, 129) # Emerald Green
+        if any(word in text for word in ["SELL", "SÄLJ", "STRONG SELL", "UNDERWEIGHT", "BEARISH", "NEGATIVE", "DOWNGRADE", "REDUCE", "REDUCERA"]):
+            return (239, 68, 68) # Red
+        if any(word in text for word in ["HOLD", "AVVAKTA", "NEUTRAL", "WAIT", "CAUTION", "HÅLL"]):
+            return (245, 158, 11) # Amber
+        return (100, 100, 100) # Gray
+
+    def add_highlights_page(self, md_text):
+        # Extract key metrics (supporting English and Swedish)
+        metrics = {
+            "Recommendation": "N/A",
+            "Action": "N/A",
+            "Target Price": "N/A",
+            "Stop Loss": "N/A",
+            "Sentiment": "N/A"
+        }
+        
+        # Simple extraction logic
+        for line in md_text.split('\n'):
+            line = line.strip()
+            # English & Swedish support
+            if any(k in line for k in ["**Recommendation**:", "Recommendation:", "**Rating**:", "Rating:", "Rekommendation:"]):
+                metrics["Recommendation"] = line.split(":", 1)[1].strip().replace("**", "")
+            elif any(k in line for k in ["**Action**:", "Action:", "Åtgärd:", "Strategiska åtgärder:"]):
+                metrics["Action"] = line.split(":", 1)[1].strip().replace("**", "")
+            elif any(k in line for k in ["**Target Price**:", "Target Price:", "**Price Target**:", "Målkurs:", "Prismål:"]):
+                metrics["Target Price"] = line.split(":", 1)[1].strip().replace("**", "")
+            elif any(k in line for k in ["**Stop Loss**:", "Stop Loss:", "Stoppmarkering:", "Stopp:"]):
+                metrics["Stop Loss"] = line.split(":", 1)[1].strip().replace("**", "")
+            elif any(k in line for k in ["Sentiment:", "Marknadssentiment:"]):
+                metrics["Sentiment"] = line.split(":", 1)[1].strip().replace("**", "")
+
+        self.pdf.add_page()
+        self.pdf.set_font('helvetica', 'B', 20)
+        self.pdf.set_text_color(22, 27, 34)
+        self.pdf.cell(0, 15, "Executive Highlights Dashboard", ln=True)
+        self.pdf.ln(5)
+        
+        # Draw Dashboard Boxes
+        start_y = self.pdf.get_y()
+        col_w = 90
+        
+        items = list(metrics.items())
+        for i, (label, val) in enumerate(items):
+            x = 10 if i % 2 == 0 else 110
+            y = start_y + (i // 2) * 35
+            
+            # Box
+            self.pdf.set_fill_color(248, 250, 252)
+            self.pdf.rect(x, y, col_w, 30, 'F')
+            self.pdf.set_draw_color(226, 232, 240)
+            self.pdf.rect(x, y, col_w, 30, 'D')
+            
+            # Label
+            self.pdf.set_xy(x + 5, y + 5)
+            self.pdf.set_font('helvetica', 'B', 10)
+            self.pdf.set_text_color(100, 116, 139)
+            self.pdf.cell(col_w - 10, 5, label.upper(), ln=True)
+            
+            # Value with status color
+            self.pdf.set_xy(x + 5, y + 15)
+            self.pdf.set_font('helvetica', 'B', 14)
+            color = self._get_status_color(val)
+            self.pdf.set_text_color(*color)
+            self.pdf.cell(col_w - 10, 10, val, ln=True)
+            
+        self.pdf.set_y(start_y + (len(items) // 2 + 1) * 35 + 10)
+        
+        # Summary Area
+        self.pdf.set_fill_color(37, 99, 235)
+        self.pdf.rect(10, self.pdf.get_y(), 190, 2, 'F')
+        self.pdf.ln(5)
+
+    def add_markdown_content(self, md_text):
+        md_text = self._strip_emojis(md_text)
+        lines = md_text.split('\n')
+        
+        in_table = False
+        table_rows = []
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            self.pdf.set_x(10)
+            
+            # Table handling
+            if '|' in line and '---|' not in line and '|---' not in line:
+                in_table = True
+                parts = [p.strip() for p in line.split('|') if p.strip()]
+                if parts:
+                    table_rows.append(parts)
+                continue
+            elif in_table:
+                self._render_table(table_rows)
+                table_rows = []
+                in_table = False
+                if not line or '---' in line: continue
+            
+            if not line:
+                self.pdf.ln(4)
+                continue
+            
+            try:
+                # Headers
+                if line.startswith('### '):
+                    self.pdf.ln(4)
+                    self.pdf.set_font('helvetica', 'B', 12)
+                    self.pdf.set_text_color(37, 99, 235)
+                    self.pdf.multi_cell(190, 8, line[4:])
+                    self.pdf.set_text_color(50, 50, 50)
+                elif line.startswith('## '):
+                    self.pdf.ln(8)
+                    self.pdf.set_fill_color(240, 244, 255)
+                    self.pdf.set_font('helvetica', 'B', 14)
+                    self.pdf.set_text_color(22, 27, 34)
+                    self.pdf.multi_cell(190, 12, f"  {line[3:]}", fill=True)
+                    self.pdf.set_draw_color(37, 99, 235)
+                    self.pdf.line(10, self.pdf.get_y(), 200, self.pdf.get_y())
+                    self.pdf.ln(4)
+                elif line.startswith('# '):
+                    if "Trading Analysis Report" in line or self.ticker in line: continue
+                    self.pdf.ln(10)
+                    self.pdf.set_font('helvetica', 'B', 18)
+                    self.pdf.set_text_color(22, 27, 34)
+                    self.pdf.multi_cell(190, 15, line[2:])
+                    self.pdf.ln(5)
+                
+                # Special handling for Recommendation/Action badges
+                elif ":" in line and any(k in line for k in ["Recommendation", "Action", "Verdict", "Sentiment"]):
+                    parts = line.split(":", 1)
+                    key = parts[0].replace("**", "").strip()
+                    val = parts[1].replace("**", "").strip()
+                    
+                    self.pdf.set_font('helvetica', 'B', 11)
+                    self.pdf.set_text_color(50, 50, 50)
+                    self.pdf.write(6, f"{key}: ")
+                    
+                    # Draw badge for value
+                    self.pdf.set_text_color(255, 255, 255)
+                    color = self._get_status_color(val)
+                    self.pdf.set_fill_color(*color)
+                    
+                    val_w = self.pdf.get_string_width(f" {val} ")
+                    self.pdf.cell(val_w, 6, val, fill=True, align='C')
+                    self.pdf.ln(8)
+                
+                # Lists
+                elif line.startswith('- ') or line.startswith('* '):
+                    self.pdf.set_font('helvetica', '', 11)
+                    self.pdf.set_text_color(60, 60, 60)
+                    current_y = self.pdf.get_y()
+                    self.pdf.set_fill_color(37, 99, 235)
+                    self.pdf.rect(12, current_y + 2, 1.5, 1.5, 'F')
+                    self.pdf.set_x(16)
+                    clean_line = re.sub(r'\*\*(.*?)\*\*', r'\1', line[2:])
+                    self.pdf.multi_cell(174, 6, clean_line)
+                
+                # Normal text
+                else:
+                    clean_line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
+                    self.pdf.set_font('helvetica', '', 11)
+                    self.pdf.set_text_color(50, 50, 50)
+                    self.pdf.multi_cell(190, 6, clean_line)
+                    
+            except Exception as e:
+                print(f"Error on line {i}: {e}")
+                continue
+
+    def _render_table(self, rows):
+        if not rows: return
+        self.pdf.ln(6)
+        
+        with self.pdf.table(
+            borders_layout="SINGLE_TOP_LINE",
+            cell_fill_color=(240, 244, 255),
+            cell_fill_mode="ROWS",
+            line_height=self.pdf.font_size * 1.5,
+            text_align="LEFT",
+            width=190,
+        ) as table:
+            # Header Row
+            self.pdf.set_font("helvetica", "B", 10)
+            self.pdf.set_text_color(22, 27, 34) # Dark text for contrast
+            header_row = table.row()
+            for header in rows[0]:
+                header_row.cell(str(header))
+            
+            # Data Rows
+            self.pdf.set_font("helvetica", "", 9)
+            self.pdf.set_text_color(50, 50, 50)
+            for row in rows[1:]:
+                data_row = table.row()
+                for cell_data in row:
+                    data_row.cell(str(cell_data))
+        
+        self.pdf.set_text_color(50, 50, 50)
+        self.pdf.ln(8)
+
+    def save(self, output_path):
+        self.pdf.output(output_path)
+        print(f"Professional report generated: {output_path}")
+
+def get_latest_report():
+    reports_dir = "reports"
+    if not os.path.exists(reports_dir): return None
+    subdirs = [os.path.join(reports_dir, d) for d in os.listdir(reports_dir) if os.path.isdir(os.path.join(reports_dir, d))]
+    if not subdirs: return None
+    subdirs.sort(reverse=True)
+    return subdirs[0]
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate a professional PDF report from a markdown file.")
+    parser.add_argument("input", nargs="?", help="Path to the markdown file or a directory containing complete_report.md")
+    parser.add_argument("-o", "--output", help="Optional output path for the PDF")
+    
+    args = parser.parse_args()
+    
+    input_path = args.input
+    if not input_path:
+        # Fallback to latest report in reports/
+        report_dir = get_latest_report()
+        if not report_dir:
+            print("No reports found in the 'reports/' directory.")
+            print("Usage: python scripts/generate_full_report_pdf.py [path_to_markdown_or_folder]")
+            sys.exit(1)
+        input_path = report_dir
+    
+    # Resolve the markdown file path
+    if os.path.isdir(input_path):
+        md_path = os.path.join(input_path, "complete_report.md")
+        ticker = os.path.basename(input_path.rstrip(os.sep)).split('_')[0]
+        output_dir = input_path
+    else:
+        md_path = input_path
+        ticker = os.path.basename(md_path).split('_')[0]
+        output_dir = os.path.dirname(md_path) or "."
+        
+    if not os.path.exists(md_path):
+        print(f"Error: Markdown file not found at {md_path}")
+        sys.exit(1)
+        
+    date_str = datetime.now().strftime("%B %d, %Y")
+    print(f"Generating professional PDF for {ticker} from {md_path}...")
+    
+    try:
+        with open(md_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        generator = MarkdownPDFGenerator(ticker=ticker, date_str=date_str)
+        generator.add_highlights_page(content)
+        generator.add_markdown_content(content)
+        
+        if args.output:
+            output_path = args.output
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_filename = f"Intelligence_Report_{ticker}_{timestamp}.pdf"
+            output_path = os.path.join(output_dir, output_filename)
+        
+        generator.save(output_path)
+    except Exception as e:
+        print(f"Critical Error during PDF generation: {e}")
+        sys.exit(1)

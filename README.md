@@ -180,6 +180,38 @@ An interface will appear showing results as they load, letting you track the age
   <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
 
+### Professional PDF Reporting
+
+TradingAgents includes a powerful PDF generation engine to convert your markdown analysis into branded, high-fidelity intelligence reports.
+
+#### Features
+- **Executive Dashboard**: Automated summary of key metrics (Recommendation, Action, Price Targets).
+- **Professional Branding**: "Bullion Analytics" themed headers, footers, and color palettes.
+- **Color-Coded Status Badges**: Visual indicators for sentiment and trading actions.
+- **Robust Layout**: Handles complex tables, lists, and multi-page wrapping automatically.
+
+#### Usage
+Generate a report from the latest analysis:
+```bash
+python scripts/generate_full_report_pdf.py
+```
+
+Generate from a specific folder or markdown file:
+```bash
+python scripts/generate_full_report_pdf.py reports/TICKER_TIMESTAMP
+python scripts/generate_full_report_pdf.py my_analysis.md -o Final_Report.pdf
+```
+
+### API Testing with Postman
+
+For testing the TradingAgents service API, we provide a comprehensive Postman collection:
+
+1. Import the collection from `postman/TradingAgents-Service-API.postman_collection.json`
+2. Configure the environment variables in `postman/TradingAgents-Service-API.postman_environment.json`
+3. Test all API endpoints including error cases
+
+See `postman/README.md` for detailed instructions on using the Postman collection.
+
 ## TradingAgents Package
 
 ### Implementation Details
@@ -219,6 +251,30 @@ print(decision)
 ```
 
 See `tradingagents/default_config.py` for all configuration options.
+
+### Service API Usage
+
+TradingAgents can also be deployed as a service API that other applications can call to generate reports for different tickers and instruments. This is especially useful for cloud hosting and serving multiple applications.
+
+To run the service:
+
+```bash
+# Set your API key
+export TRADINGAGENTS_SERVICE_API_KEY=your-secret-api-key
+
+# Run the service
+python scripts/run_service.py
+```
+
+Or using Docker:
+
+```bash
+docker-compose -f docker-compose.service.yml up
+```
+
+For detailed deployment instructions for cloud environments (Kubernetes, AWS, GCP, Azure), see `DEPLOYMENT.md` and the `k8s/` directory.
+
+The service provides a REST API for submitting report jobs, checking status, and downloading PDF reports. See `docs/saas-service-api.md` for API documentation and `scripts/client_example.py` for a client implementation example.
 
 ## Persistence and Recovery
 

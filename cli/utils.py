@@ -241,7 +241,7 @@ def select_llm_provider() -> tuple[str, str | None]:
         ("GLM", "glm", "https://open.bigmodel.cn/api/paas/v4/"),
         ("OpenRouter", "openrouter", "https://openrouter.ai/api/v1"),
         ("Azure OpenAI", "azure", None),
-        ("Ollama", "ollama", "http://localhost:11434/v1"),
+        ("Ollama", "ollama", "https://api.ollama.com"),
     ]
 
     choice = questionary.select(
@@ -332,6 +332,7 @@ def ask_output_language() -> str:
         "Select Output Language:",
         choices=[
             questionary.Choice("English (default)", "English"),
+            questionary.Choice("Swedish (Svenska)", "Swedish"),
             questionary.Choice("Chinese (中文)", "Chinese"),
             questionary.Choice("Japanese (日本語)", "Japanese"),
             questionary.Choice("Korean (한국어)", "Korean"),

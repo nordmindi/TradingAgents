@@ -1,0 +1,138 @@
+{
+  "report_templates": {
+    "mining_gold_focus": {
+      "name": "Mining & Gold Sector Report",
+      "description": "Focused analysis on gold and mining stocks",
+      "tickers": ["GOLD", "NEM", "WPM", "FNV", "AEM", "KL", "GFI", "RGLD"],
+      "categories": ["MINING_GOLD", "COMMODITIES"],
+      "weight_sentiment": 0.4,
+      "weight_price": 0.3,
+      "weight_social": 0.2,
+      "weight_news": 0.1,
+      "alerts": {
+        "price_change_threshold": 0.02,
+        "sentiment_spike_threshold": 0.5
+      }
+    },
+    
+    "tech_stocks": {
+      "name": "Technology Stocks Report",
+      "description": "Analysis of major tech companies",
+      "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "AMD", "INTC"],
+      "categories": ["TECH_STOCKS", "GENERAL_MARKETS"],
+      "weight_sentiment": 0.35,
+      "weight_price": 0.35,
+      "weight_social": 0.2,
+      "weight_news": 0.1,
+      "alerts": {
+        "price_change_threshold": 0.03,
+        "sentiment_spike_threshold": 0.4
+      }
+    },
+    
+    "crypto_focus": {
+      "name": "Cryptocurrency Report",
+      "description": "Crypto market sentiment and price analysis",
+      "tickers": ["BTC", "ETH", "XRP", "ADA", "SOL", "DOT", "LINK", "MATIC", "AVAX"],
+      "categories": ["CRYPTO", "GENERAL_MARKETS"],
+      "weight_sentiment": 0.5,
+      "weight_price": 0.3,
+      "weight_social": 0.15,
+      "weight_news": 0.05,
+      "alerts": {
+        "price_change_threshold": 0.05,
+        "sentiment_spike_threshold": 0.6
+      }
+    },
+    
+    "forex_trading": {
+      "name": "Forex Trading Report",
+      "description": "Currency pair analysis",
+      "tickers": ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "EURSEK", "USDSEK"],
+      "categories": ["FOREX", "GENERAL_MARKETS"],
+      "weight_sentiment": 0.3,
+      "weight_price": 0.4,
+      "weight_social": 0.2,
+      "weight_news": 0.1,
+      "alerts": {
+        "price_change_threshold": 0.01,
+        "sentiment_spike_threshold": 0.3
+      }
+    },
+    
+    "commodities": {
+      "name": "Commodities Report",
+      "description": "Raw materials and commodity analysis",
+      "tickers": ["GOLD", "SILVER", "COPPER", "OIL", "NATGAS", "WHEAT", "CORN", "COTTON", "COFFEE"],
+      "categories": ["COMMODITIES", "MINING_GOLD"],
+      "weight_sentiment": 0.35,
+      "weight_price": 0.35,
+      "weight_social": 0.2,
+      "weight_news": 0.1,
+      "alerts": {
+        "price_change_threshold": 0.025,
+        "sentiment_spike_threshold": 0.45
+      }
+    },
+    
+    "junior_miners": {
+      "name": "Junior Mining Companies",
+      "description": "Analysis of small-cap mining stocks",
+      "tickers": ["GWM", "NFG", "LAB", "GOT", "VGCX", "SKE", "AU", "CXB"],
+      "categories": ["CANADIAN_MARKETS", "MINING_GOLD"],
+      "weight_sentiment": 0.25,
+      "weight_price": 0.25,
+      "weight_social": 0.25,
+      "weight_sedar": 0.25,
+      "alerts": {
+        "price_change_threshold": 0.05,
+        "sentiment_spike_threshold": 0.7
+      }
+    },
+    
+    "broad_market": {
+      "name": "Broad Market Overview",
+      "description": "Comprehensive market analysis across sectors",
+      "tickers": ["SPY", "QQQ", "IWM", "DIA", "VIX", "GLD", "SLV", "USO"],
+      "categories": ["GENERAL_MARKETS", "TECH_STOCKS", "COMMODITIES", "FOREX"],
+      "weight_sentiment": 0.3,
+      "weight_price": 0.3,
+      "weight_social": 0.25,
+      "weight_news": 0.15,
+      "alerts": {
+        "price_change_threshold": 0.02,
+        "sentiment_spike_threshold": 0.4
+      }
+    },
+    
+    "meme_stocks": {
+      "name": "Meme Stocks Tracker",
+      "description": "Social sentiment for high-interest stocks",
+      "tickers": ["GME", "AMC", "PLTR", "BB", "NOK", "CLOV", "WISH", "SOFI"],
+      "categories": ["TECH_STOCKS", "GENERAL_MARKETS"],
+      "weight_sentiment": 0.45,
+      "weight_social": 0.35,
+      "weight_price": 0.15,
+      "weight_news": 0.05,
+      "alerts": {
+        "price_change_threshold": 0.08,
+        "sentiment_spike_threshold": 0.8
+      }
+    }
+  },
+  
+  "custom_report": {
+    "description": "Create custom report by specifying tickers and categories",
+    "example": {
+      "name": "My Custom Portfolio",
+      "tickers": ["AAPL", "TSLA", "BTC", "GOLD"],
+      "categories": ["TECH_STOCKS", "CRYPTO", "COMMODITIES"],
+      "weights": {
+        "sentiment": 0.4,
+        "price": 0.3,
+        "social": 0.2,
+        "news": 0.1
+      }
+    }
+  }
+}

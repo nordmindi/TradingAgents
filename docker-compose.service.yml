@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  tradingagents-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    env_file:
+      - .env
+    environment:
+      - TRADINGAGENTS_SERVICE_API_KEY=${TRADINGAGENTS_SERVICE_API_KEY:-change-me-in-production}
+      - TRADINGAGENTS_SERVICE_REPORTS_DIR=/data/reports
+      - TRADINGAGENTS_SERVICE_CACHE_DIR=/data/cache
+      - TRADINGAGENTS_SERVICE_MEMORY_DIR=/data/memory
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - tradingagents_data:/data
+      - ./reports:/data/reports
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Optional: Ollama service for local LLM support
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles:
+      - ollama
+    restart: unless-stopped
+
+  tradingagents-service-ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    env_file:
+      - .env
+    environment:
+      - TRADINGAGENTS_SERVICE_API_KEY=${TRADINGAGENTS_SERVICE_API_KEY:-change-me-in-production}
+      - TRADINGAGENTS_SERVICE_REPORTS_DIR=/data/reports
+      - TRADINGAGENTS_SERVICE_CACHE_DIR=/data/cache
+      - TRADINGAGENTS_SERVICE_MEMORY_DIR=/data/memory
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LLM_PROVIDER=ollama
+    volumes:
+      - tradingagents_data:/data
+      - ./reports:/data/reports
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    profiles:
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  tradingagents_data:
+    driver: local
+  ollama_data:
+    driver: local
