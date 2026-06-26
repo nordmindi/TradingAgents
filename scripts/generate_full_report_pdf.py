@@ -23,6 +23,8 @@ class VeinReportPDF(FPDF):
             'white': (255, 255, 255)
         }
         self.set_margins(15, 20, 15) # Standardized margins (Left, Top, Right)
+        # Calculate content width (page width - left margin - right margin)
+        self.content_width = self.w - 15 - 15
 
     def header(self):
         if self.page_no() == 1: return
@@ -34,11 +36,11 @@ class VeinReportPDF(FPDF):
         self.set_xy(15, 8)
         self.set_text_color(*self.colors['white'])
         self.set_font('helvetica', 'B', 14)
-        self.cell(0, 8, 'VEIN AI // INTELLIGENCE REPORT', ln=True)
+        self.cell(self.content_width, 8, 'VEIN AI // INTELLIGENCE REPORT', ln=True)
         
         self.set_font('helvetica', '', 8)
         self.set_x(15)
-        self.cell(0, 4, 'SUPPLY CHAIN RISK ASSESSMENT FRAMEWORK', ln=False)
+        self.cell(self.content_width, 4, 'SUPPLY CHAIN RISK ASSESSMENT FRAMEWORK', ln=False)
         
         self.set_xy(self.w - 45, 12)
         self.set_font('helvetica', 'B', 9)
@@ -53,7 +55,7 @@ class VeinReportPDF(FPDF):
         # Draw a thin separator
         self.set_draw_color(*self.colors['border'])
         self.line(15, self.get_y(), self.w - 15, self.get_y())
-        self.cell(0, 10, f'Proprietary Intelligence Data | Vein AI | {datetime.now().strftime("%Y-%m-%d")}', align='C')
+        self.cell(self.content_width, 10, f'Proprietary Intelligence Data | Vein AI | {datetime.now().strftime("%Y-%m-%d")}', align='C')
 
     def add_title_page(self, ticker, date_str):
         self.add_page()
@@ -66,18 +68,18 @@ class VeinReportPDF(FPDF):
         self.set_text_color(*self.colors['text'])
         self.set_font('helvetica', 'B', 32)
         # multi_cell prevents the title from ever going off page
-        self.multi_cell(0, 15, 'SUPPLY CHAIN\nINTELLIGENCE', align='C')
+        self.multi_cell(self.content_width, 15, 'SUPPLY CHAIN\nINTELLIGENCE', align='C')
         
         self.set_y(140)
         self.set_font('helvetica', 'B', 24)
         self.set_text_color(*self.colors['primary'])
-        self.cell(0, 20, f'TICKER: {ticker}', ln=True, align='C')
+        self.cell(self.content_width, 20, f'TICKER: {ticker}', ln=True, align='C')
         
         self.set_y(220)
         self.set_text_color(*self.colors['text_muted'])
         self.set_font('helvetica', '', 12)
-        self.cell(0, 8, f'Analysis Date: {date_str}', ln=True, align='C')
-        self.cell(0, 8, 'Compiled by Vein AI Framework', ln=True, align='C')
+        self.cell(self.content_width, 8, f'Analysis Date: {date_str}', ln=True, align='C')
+        self.cell(self.content_width, 8, 'Compiled by Vein AI Framework', ln=True, align='C')
 
 class MarkdownPDFGenerator:
     def __init__(self, ticker="UNKNOWN", date_str=""):
@@ -117,13 +119,13 @@ class MarkdownPDFGenerator:
         self.pdf.set_xy(20, curr_y + 3)
         self.pdf.set_font('helvetica', 'B', 9)
         self.pdf.set_text_color(*color)
-        self.pdf.cell(0, 5, title.upper(), ln=True)
+        self.pdf.cell(160, 5, title.upper(), ln=True)
         
         # Content
         self.pdf.set_x(20)
         self.pdf.set_font('helvetica', '', 10)
         self.pdf.set_text_color(*self.colors['text'])
-        self.pdf.multi_cell(170, 6, text)
+        self.pdf.multi_cell(self.content_width - 20, 6, text)
         self.pdf.ln(5)
 
     def add_highlights_page(self, md_text):
@@ -138,32 +140,37 @@ class MarkdownPDFGenerator:
         self.pdf.add_page()
         self.pdf.set_font('helvetica', 'B', 20)
         self.pdf.set_text_color(*self.colors['text'])
-        self.pdf.cell(0, 15, "Executive Highlights Dashboard", ln=True)
+        self.pdf.cell(self.pdf.content_width, 15, "Executive Highlights Dashboard", ln=True)
         
         # Dashboard Cards (2-column layout)
         start_y = self.pdf.get_y()
         items = list(metrics.items())
+        # Calculate card width (content_width / 2 - padding)
+        card_width = (self.content_width / 2) - 5
+        card_height = 28
+        card_spacing = 32
+        
         for i, (label, val) in enumerate(items):
-            x = 15 if i % 2 == 0 else 105
-            y = start_y + (i // 2) * 32
+            x = 15 if i % 2 == 0 else (15 + card_width + 10)
+            y = start_y + (i // 2) * card_spacing
             
             self.pdf.set_fill_color(*self.colors['surface'])
-            self.pdf.rect(x, y, 85, 28, 'F')
+            self.pdf.rect(x, y, card_width, card_height, 'F')
             self.pdf.set_draw_color(*self.colors['border'])
-            self.pdf.rect(x, y, 85, 28, 'D')
+            self.pdf.rect(x, y, card_width, card_height, 'D')
             
             self.pdf.set_xy(x + 5, y + 5)
             self.pdf.set_font('helvetica', 'B', 8)
             self.pdf.set_text_color(*self.colors['text_muted'])
-            self.pdf.cell(0, 5, label.upper(), ln=True)
+            self.pdf.cell(card_width - 10, 5, label.upper(), ln=True)
             
             self.pdf.set_x(x + 5)
             self.pdf.set_font('helvetica', 'B', 12)
             self.pdf.set_text_color(*self._get_status_color(val))
             # Multi-cell prevents value overflow in boxes
-            self.pdf.multi_cell(75, 7, val)
+            self.pdf.multi_cell(card_width - 10, 7, val)
             
-        self.pdf.set_y(start_y + (len(items) // 2 + 1) * 32 + 10)
+        self.pdf.set_y(start_y + (len(items) // 2 + 1) * card_spacing + 10)
 
     def add_markdown_content(self, md_text):
         lines = md_text.split('\n')
@@ -190,7 +197,7 @@ class MarkdownPDFGenerator:
                 self.pdf.ln(5)
                 self.pdf.set_font('helvetica', 'B', 14)
                 self.pdf.set_text_color(*self.colors['primary'])
-                self.pdf.multi_cell(0, 10, line[3:].upper())
+                self.pdf.multi_cell(self.content_width, 10, line[3:].upper())
                 self.pdf.set_draw_color(*self.colors['primary'])
                 self.pdf.line(15, self.pdf.get_y(), 60, self.pdf.get_y())
                 self.pdf.ln(3)
@@ -198,7 +205,7 @@ class MarkdownPDFGenerator:
             elif line.startswith('### '):
                 self.pdf.set_font('helvetica', 'B', 11)
                 self.pdf.set_text_color(*self.colors['text'])
-                self.pdf.multi_cell(0, 8, line[4:])
+                self.pdf.multi_cell(self.content_width, 8, line[4:])
                 
             # STRATEGIC ACTIONS HANDLING
             elif "Strategic Action" in line or "Action:" in line:
@@ -216,19 +223,19 @@ class MarkdownPDFGenerator:
                 self.pdf.set_font('helvetica', 'B', 10)
                 self.pdf.text(16, self.pdf.get_y() + 4, ">")
                 self.pdf.set_font('helvetica', '', 10)
-                self.pdf.multi_cell(0, 6, line[2:])
+                self.pdf.multi_cell(self.content_width - 20, 6, line[2:])
             
             # Regular Paragraphs
             else:
                 self.pdf.set_font('helvetica', '', 10)
                 self.pdf.set_text_color(*self.colors['text'])
                 clean_line = line.replace("**", "")
-                self.pdf.multi_cell(0, 6, clean_line)
+                self.pdf.multi_cell(self.content_width, 6, clean_line)
 
     def _render_table(self, rows):
         if not rows: return
         self.pdf.set_font("helvetica", "B", 9)
-        with self.pdf.table(width=180, col_widths=None, text_align="LEFT", line_height=7) as table:
+        with self.pdf.table(width=self.content_width, col_widths=None, text_align="LEFT", line_height=7) as table:
             for i, row in enumerate(rows):
                 r = table.row()
                 if i == 0: # Header
@@ -242,7 +249,7 @@ class MarkdownPDFGenerator:
         self.pdf.output(output_path)
 
 # (Rest of your execution logic / argparse stays same)
-        print(f"Vein AI report generated: {output_path}")
+        print(f"Vein Explorer report generated: {output_path}")
 
 def get_latest_report():
     reports_dir = "reports"
@@ -254,7 +261,7 @@ def get_latest_report():
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Generate a Vein AI PDF report from a markdown file.")
+    parser = argparse.ArgumentParser(description="Generate a Vein Explorer PDF report from a markdown file.")
     parser.add_argument("input", nargs="?", help="Path to the markdown file or a directory containing complete_report.md")
     parser.add_argument("-o", "--output", help="Optional output path for the PDF")
     
@@ -285,7 +292,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     date_str = datetime.now().strftime("%B %d, %Y")
-    print(f"Generating Vein AI PDF for {ticker} from {md_path}...")
+    print(f"Generating Vein Explorer PDF for {ticker} from {md_path}...")
     
     try:
         with open(md_path, 'r', encoding='utf-8') as f:
