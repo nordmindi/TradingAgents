@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import traceback
@@ -80,6 +81,7 @@ class ReportJobResponse(BaseModel):
     markdown_path: str | None = None
     pdf_path: str | None = None
     pdf_url: str | None = None
+    json_url: str | None = None
 
 
 class JobRecord:
@@ -238,7 +240,47 @@ def get_report(job_id: str) -> ReportJobResponse:
         markdown_path=str(result.markdown_path) if result else None,
         pdf_path=str(result.pdf_path) if result else None,
         pdf_url=f"/v1/reports/{job_id}/pdf" if result else None,
+        json_url=f"/v1/reports/{job_id}/json" if result else None,
     )
+
+
+@app.get("/v1/reports/{job_id}/json", dependencies=[Depends(require_service_key)])
+def download_report_json(job_id: str) -> dict:
+    """Download the complete report data as JSON for dashboard integration."""
+    record = _get_job(job_id)
+    if record.status != JobStatus.completed or record.result is None:
+        logger.warning(
+            f"JSON download attempted for incomplete job | Job: {job_id} | Status: {record.status}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job not completed or no results available",
+        )
+    
+    # Read the JSON log file that contains all the report data
+    log_dir = record.result.report_dir.parent.parent / "TradingAgentsStrategy_logs"
+    log_files = list(log_dir.glob(f"full_states_log_*.json"))
+    
+    if not log_files:
+        logger.error(f"JSON log file not found for job {job_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report data not found",
+        )
+    
+    # Get the most recent log file
+    log_file = sorted(log_files, key=lambda x: x.stat().st_mtime)[-1]
+    
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            report_data = json.load(f)
+        return report_data
+    except Exception as e:
+        logger.error(f"Failed to read JSON report for job {job_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to read report data",
+        )
 
 
 @app.get("/v1/reports/{job_id}/pdf", dependencies=[Depends(require_service_key)])
