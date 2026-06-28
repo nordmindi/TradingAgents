@@ -84,7 +84,12 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
     config["memory_log_path"] = str(memory_root / "trading_memory.md")
 
     # Auto-detect provider based on available API keys if not explicitly set
-    if request.llm_provider is None:
+    # Only auto-detect if neither request nor environment has set a provider
+    env_provider = config.get("llm_provider")
+    env_deep_model = config.get("deep_think_llm")
+    env_quick_model = config.get("quick_think_llm")
+    
+    if request.llm_provider is None and env_provider is None:
         # Check environment variables to determine the best available provider
         openai_key = os.getenv("OPENAI_API_KEY")
         google_key = os.getenv("GOOGLE_API_KEY")
@@ -93,23 +98,49 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
         if openai_key:
             config["llm_provider"] = "openai"
             # Use more accessible models if the default ones aren't available
-            if config["deep_think_llm"] in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"]:
+            if env_deep_model in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"] or env_deep_model is None:
                 config["deep_think_llm"] = "gpt-4o-mini"
-            if config["quick_think_llm"] in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"]:
+            if env_quick_model in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"] or env_quick_model is None:
                 config["quick_think_llm"] = "gpt-4o-mini"
         elif google_key:
             config["llm_provider"] = "google"
-            config["deep_think_llm"] = "gemini-2.5-flash"
-            config["quick_think_llm"] = "gemini-2.5-flash"
+            if env_deep_model is None:
+                config["deep_think_llm"] = "gemini-2.5-flash"
+            if env_quick_model is None:
+                config["quick_think_llm"] = "gemini-2.5-flash"
         elif ollama_key:
             config["llm_provider"] = "ollama"
-            config["deep_think_llm"] = "llama3.1:8b"
-            config["quick_think_llm"] = "llama3.1:8b"
+            if env_deep_model is None:
+                config["deep_think_llm"] = "llama3.1:8b"
+            if env_quick_model is None:
+                config["quick_think_llm"] = "llama3.1:8b"
         else:
             # Fallback to openai but with more accessible models
             config["llm_provider"] = "openai"
-            config["deep_think_llm"] = "gpt-4o-mini"
-            config["quick_think_llm"] = "gpt-4o-mini"
+            if env_deep_model is None:
+                config["deep_think_llm"] = "gpt-4o-mini"
+            if env_quick_model is None:
+                config["quick_think_llm"] = "gpt-4o-mini"
+    # If provider is set via environment, ensure models are compatible
+    elif env_provider is not None and request.llm_provider is None:
+        if env_provider == "ollama":
+            # For Ollama, set appropriate defaults if models aren't set or are incompatible
+            if request.deep_think_llm is None and env_deep_model is None:
+                config["deep_think_llm"] = "llama3.1:8b"
+            elif request.deep_think_llm is None and env_deep_model is not None:
+                # Keep the environment variable model, but log a warning if it seems incompatible
+                pass  # We'll let the user decide their model names
+            if request.quick_think_llm is None and env_quick_model is None:
+                config["quick_think_llm"] = "llama3.1:8b"
+            elif request.quick_think_llm is None and env_quick_model is not None:
+                # Keep the environment variable model
+                pass
+        elif env_provider == "google":
+            # Set Google-specific defaults if not explicitly set in request
+            if request.deep_think_llm is None and env_deep_model is None:
+                config["deep_think_llm"] = "gemini-2.5-flash"
+            if request.quick_think_llm is None and env_quick_model is None:
+                config["quick_think_llm"] = "gemini-2.5-flash"
 
     overrides = {
         "llm_provider": request.llm_provider,
@@ -129,7 +160,10 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
         f"Config built | Job: {job_id} | "
         f"LLM: {config.get('llm_provider')} | "
         f"Deep Think: {config.get('deep_think_llm')} | "
-        f"Quick Think: {config.get('quick_think_llm')}"
+        f"Quick Think: {config.get('quick_think_llm')} | "
+        f"Env Provider: {env_provider} | "
+        f"Env Deep: {env_deep_model} | "
+        f"Env Quick: {env_quick_model}"
     )
 
     return config

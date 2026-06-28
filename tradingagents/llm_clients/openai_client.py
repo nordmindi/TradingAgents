@@ -94,6 +94,11 @@ class OpenAIClient(BaseLLMClient):
                     llm_kwargs["api_key"] = api_key
                 else:
                     llm_kwargs["api_key"] = "ollama"
+                
+                # Log configuration for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Ollama client config - URL: {llm_kwargs['base_url']}, Model: {self.model}")
             else:
                 llm_kwargs["base_url"] = base_url
                 if api_key_env:
