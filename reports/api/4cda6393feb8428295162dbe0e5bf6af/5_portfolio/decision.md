@@ -1,0 +1,13 @@
+**Rating**: Overweight
+
+**Executive Summary**: Maintain full existing AAPL exposure without trimming and stage limit buy orders at $278 (10 EMA, 25% of new allocation) and $270 (Bollinger mid-band, 25% of new allocation) to gradually increase position on anticipated pullbacks. Set a hard stop-loss at $262 (50 SMA) where the structural bull thesis breaks. If price breaks above $288.20 on volume exceeding 58M shares, add 25% of planned allocation immediately with a trailing stop at the 10 EMA. Time horizon: 3–6 months.
+
+**Investment Thesis**: The Overweight rating is driven by two converging factors: the structural bull trend remains fully intact, and the prior lesson from our 2026-05-07 Underweight call penalized us for fading tactical overextension in a confirmed Golden Cross setup. That decision cost us 1.6% in alpha because we reduced exposure into what turned out to be a continuation, not a reversal. The evidence base now reinforces this lesson — the 10/50/200 SMA alignment is textbook bullish, RSI confirms price with no divergence, and the fundamental moat justifies sustained ownership. We must not repeat the mistake of trimming into strength when the trend structure is this well-organized.
+
+However, the near-term risk/reward at $287 is objectively poor and both the bear and neutral analysts correctly identify this: only $1.20 of upside to the Bollinger upper band versus 6% downside to the mid-band ($270) and 8.8% to the 50 SMA ($262). The 70% combined probability of pullback or consolidation, the 22-point RSI surge in one month (7.5 points in 3 days), the 3.2% extension above the 10 EMA, and the 13% ATR spike all signal that deploying fresh capital at current levels is imprudent. The aggressive analyst's argument that moving averages will "chase price" is valid directionally but ignores the timing risk — even in structural bulls, extensions revert before extending again.
+
+The solution is an Overweight stance rather than a flat Hold: we maintain full exposure (correcting the Underweight error) while deploying new capital only at levels where risk/reward flips favorable. The staged entries at $278 (10 EMA, shallow consolidation) and $270 (Bollinger mid-band, deeper mean reversion) capture the two most probable pullback scenarios identified by all three analysts. The $262 hard stop protects against a structural trend break. The $288.20 breakout contingency ensures we add exposure if the bear's exhaustion thesis is invalidated, preventing the very underperformance that cost us in the prior cycle.
+
+**Price Target**: 288.2
+
+**Time Horizon**: 3-6 months

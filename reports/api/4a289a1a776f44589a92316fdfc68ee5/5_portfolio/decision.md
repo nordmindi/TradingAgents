@@ -1,0 +1,17 @@
+**Rating**: Underweight
+
+**Executive Summary**: Trim 10–15% of existing AAPL position at ~$287 to bank profit into resistance and reduce exposure to a likely 3–5 session mean-reversion pullback. Set stop-loss at $274 (≈2× ATR, aligning with VWMA support) on remaining exposure, and place a limit buy at $275 to reload the trimmed size at institutional cost basis. Hard stop at $254 on all AAPL exposure if the Golden Cross structure fails. Time horizon: 3–6 months.
+
+**Investment Thesis**: The consensus across all three analysts — despite their directional disagreements — is that AAPL is structurally sound but tactically overextended. The Underweight rating is warranted by three converging near-term risk signals that override the long-term bull thesis at current price levels.
+
+First, the $12 VWMA-to-price gap ($275.45 vs. $287.25) is the single strongest tactical signal. The aggressive analyst correctly identified that the volume-weighted institutional cost basis sits well below current prices, and the neutral analyst acknowledged this gap implies a high probability of near-term pullback. The conservative analyst's counter — that the 91.8M and 79.9M share days on April 30–May 1 represent institutional accumulation — actually reinforces the bear case on timing: institutions accumulated at $250–$260, not at $287. The subsequent rally on diminishing volume is characteristic of momentum handoff, not fresh institutional conviction.
+
+Second, the risk/reward math at current levels is unfavorable. Price is pressing the upper Bollinger Band ($288.20) and the $285–$288 resistance zone simultaneously, offering ~1% upside to a breakout versus 4–8% downside to VWMA or the 50 SMA. The conservative analyst's argument that assets can remain overbought is valid but does not change the asymmetric probability distribution: a kiss-back is more likely than a breakout at this exact juncture, especially with the MACD histogram at +1.69 (late-stage momentum acceleration) and RSI at 69.31 mirroring the February analog that preceded an 8% selloff.
+
+Third, however, the conservative analyst's critique of the 20–30% trim size has merit. In a confirmed Golden Cross with bullish MA stacking (price > 10 EMA > 50 SMA > 200 SMA) and real institutional volume, over-trimming risks missing a breakout above $290 on 85M+ share volume. The neutral analyst's 10–15% trim preserves 85% of exposure for upside capture while acknowledging the overextension — this is the optimal sizing. Similarly, the conservative analyst's $278 stop is too tight (guaranteed to be whipsawed given $6.64 ATR), while the trader's $254 stop is too wide (concedes the entire rally). The neutral analyst's $274 stop (2× ATR, VWMA-aligned) is the right risk-management anchor: it gives the trade room to breathe through a normal pullback while protecting the core gain if the trend structure breaks.
+
+The execution path is clear: reduce marginal exposure now into strength, protect remaining exposure at VWMA, and prepare to add back at the level where risk/reward flips favorable. If AAPL closes above $290 on volume >85M shares, the resistance thesis collapses and we add back trimmed exposure with a trailing 10 EMA stop.
+
+**Price Target**: 275.0
+
+**Time Horizon**: 3–6 months
