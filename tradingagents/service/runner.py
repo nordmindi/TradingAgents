@@ -83,6 +83,34 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
     config["data_cache_dir"] = str(cache_root)
     config["memory_log_path"] = str(memory_root / "trading_memory.md")
 
+    # Auto-detect provider based on available API keys if not explicitly set
+    if request.llm_provider is None:
+        # Check environment variables to determine the best available provider
+        openai_key = os.getenv("OPENAI_API_KEY")
+        google_key = os.getenv("GOOGLE_API_KEY")
+        ollama_key = os.getenv("OLLAMA_API_KEY")
+        
+        if openai_key:
+            config["llm_provider"] = "openai"
+            # Use more accessible models if the default ones aren't available
+            if config["deep_think_llm"] in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"]:
+                config["deep_think_llm"] = "gpt-4o-mini"
+            if config["quick_think_llm"] in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"]:
+                config["quick_think_llm"] = "gpt-4o-mini"
+        elif google_key:
+            config["llm_provider"] = "google"
+            config["deep_think_llm"] = "gemini-2.5-flash"
+            config["quick_think_llm"] = "gemini-2.5-flash"
+        elif ollama_key:
+            config["llm_provider"] = "ollama"
+            config["deep_think_llm"] = "llama3.1:8b"
+            config["quick_think_llm"] = "llama3.1:8b"
+        else:
+            # Fallback to openai but with more accessible models
+            config["llm_provider"] = "openai"
+            config["deep_think_llm"] = "gpt-4o-mini"
+            config["quick_think_llm"] = "gpt-4o-mini"
+
     overrides = {
         "llm_provider": request.llm_provider,
         "deep_think_llm": request.deep_think_llm,
