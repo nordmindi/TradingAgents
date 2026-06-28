@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
@@ -21,6 +22,10 @@ from tradingagents.service.runner import (
     run_report_job,
     validate_report_request,
 )
+
+# Load environment variables
+load_dotenv()
+load_dotenv(".env.enterprise", override=False)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -170,7 +175,7 @@ def _get_job(job_id: str) -> JobRecord:
 def health() -> dict[str, str]:
     active_jobs = sum(1 for j in jobs.values() if j.status == JobStatus.running)
     logger.debug(f"Health check | Active jobs: {active_jobs} | Total jobs: {len(jobs)}")
-    return {"status": "ok", "active_jobs": active_jobs, "total_jobs": len(jobs)}
+    return {"status": "ok", "active_jobs": str(active_jobs), "total_jobs": str(len(jobs))}
 
 
 @app.post(
