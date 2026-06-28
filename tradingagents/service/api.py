@@ -285,9 +285,10 @@ def download_report_json(job_id: str) -> dict:
         )
     
     # Read the JSON log file that contains all the report data
-    # The JSON logs are saved in: results_dir / ticker / "TradingAgentsStrategy_logs"
-    # Where results_dir is reports/api/_logs/job_id
-    log_dir = record.result.report_dir / record.result.ticker / "TradingAgentsStrategy_logs"
+    # The JSON logs are saved in: reports/api/_logs/job_id / ticker / "TradingAgentsStrategy_logs"
+    # But record.result.report_dir is: reports/api/job_id
+    # So we need to go to: reports/api/_logs/job_id / ticker / "TradingAgentsStrategy_logs"
+    log_dir = record.result.report_dir.parent / "_logs" / job_id / record.result.ticker / "TradingAgentsStrategy_logs"
     log_files = list(log_dir.glob(f"full_states_log_*.json"))
     
     if not log_files:
