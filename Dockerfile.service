@@ -22,6 +22,9 @@ COPY --chown=app:app tradingagents/ tradingagents/
 COPY --chown=app:app cli/ cli/
 COPY --chown=app:app scripts/ scripts/
 
+# Install build dependencies first (setuptools required by pyproject.toml build-system)
+RUN pip install --no-cache-dir "setuptools>=61.0" wheel
+
 # Install the package
 RUN pip install --no-cache-dir .
 
