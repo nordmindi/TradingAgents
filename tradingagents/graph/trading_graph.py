@@ -386,6 +386,24 @@ class TradingAgentsGraph:
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(self.log_states_dict[str(trade_date)], f, indent=4)
 
+    def save_reports(self, final_state, ticker, save_path=None) -> Path:
+        """Write the markdown report tree for a completed run, like the CLI does.
+
+        Programmatic callers get the same on-disk reports the CLI produces. Pass
+        an explicit ``save_path`` or let it default under ``results_dir``.
+        """
+        from tradingagents.reporting import write_report_tree
+        
+        if save_path is None:
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            from tradingagents.dataflows.utils import safe_ticker_component
+            save_path = (
+                Path(self.config["results_dir"])
+                / "reports"
+                / f"{safe_ticker_component(ticker)}_{stamp}"
+            )
+        return write_report_tree(final_state, ticker, save_path)
+
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""
         return self.signal_processor.process_signal(full_signal)

@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.reporting import generate_pdf_from_markdown, save_report_to_disk
+from tradingagents.reporting import generate_pdf_from_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
     report_dir = report_root / job_id
     
     logger.info(f"Saving report to disk | Job: {job_id} | Directory: {report_dir}")
-    markdown_path = save_report_to_disk(final_state, ticker, report_dir)
+    markdown_path = graph.save_reports(final_state, ticker, report_dir)
     logger.info(f"Markdown report saved | Job: {job_id} | Path: {markdown_path}")
     
     logger.info(f"Generating PDF | Job: {job_id} | Ticker: {ticker}")
