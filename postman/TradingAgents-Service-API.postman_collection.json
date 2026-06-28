@@ -452,6 +452,110 @@
         "description": "Attempts to download PDF for a non-existent job ID."
       },
       "response": []
+    },
+    {
+      "name": "Create Report Job - Free Tier",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Accepted\", function () {",
+              "  pm.expect(pm.response.code).to.eql(202);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json.job_id) {",
+              "  pm.collectionVariables.set(\"job_id\", json.job_id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"TSLA\",\n  \"analysis_date\": \"2026-05-07\",\n  \"report_tier\": \"free\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Creates a FREE TIER report job with minimal configuration for faster processing."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Report Job - Pro Tier",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Accepted\", function () {",
+              "  pm.expect(pm.response.code).to.eql(202);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json.job_id) {",
+              "  pm.collectionVariables.set(\"job_id\", json.job_id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticker\": \"GOOGL\",\n  \"analysis_date\": \"2026-05-07\",\n  \"report_tier\": \"pro\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/reports",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "reports"
+          ]
+        },
+        "description": "Creates a PRO TIER report job with full configuration and comprehensive analysis."
+      },
+      "response": []
     }
   ],
   "variable": [

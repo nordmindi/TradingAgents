@@ -37,6 +37,11 @@ class JobStatus(str, Enum):
     failed = "failed"
 
 
+class ReportTier(str, Enum):
+    free = "free"
+    pro = "pro"
+
+
 class CreateReportRequest(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=32)
     analysis_date: str | None = None
@@ -52,6 +57,7 @@ class CreateReportRequest(BaseModel):
     max_risk_discuss_rounds: int | None = Field(default=None, ge=1)
     checkpoint_enabled: bool | None = None
     user_id: str | None = Field(default=None, max_length=128)
+    report_tier: ReportTier = ReportTier.pro  # Default to pro for backward compatibility
 
     @field_validator("ticker")
     @classmethod
@@ -177,22 +183,38 @@ def create_report(payload: CreateReportRequest) -> CreateReportResponse:
     analysis_date = payload.analysis_date or datetime.now().strftime("%Y-%m-%d")
     job_id = uuid4().hex
     
-    logger.info(
-        f"Creating job {job_id} | Ticker: {payload.ticker} | "
-        f"Date: {analysis_date} | Analysts: {payload.selected_analysts}"
-    )
+    # Apply tier-based configurations
+    selected_analysts = list(payload.selected_analysts)
+    max_debate_rounds = payload.max_debate_rounds
+    max_risk_discuss_rounds = payload.max_risk_discuss_rounds
+    
+    if payload.report_tier == ReportTier.free:
+        # Free tier: minimal configuration for faster processing
+        selected_analysts = ["market"]  # Only market analyst for free tier
+        max_debate_rounds = max_debate_rounds or 1  # Limit debate rounds
+        max_risk_discuss_rounds = max_risk_discuss_rounds or 1  # Limit risk discussion
+        logger.info(
+            f"Creating FREE TIER job {job_id} | Ticker: {payload.ticker} | "
+            f"Date: {analysis_date} | Analysts: {selected_analysts}"
+        )
+    else:
+        # Pro tier: full configuration
+        logger.info(
+            f"Creating PRO TIER job {job_id} | Ticker: {payload.ticker} | "
+            f"Date: {analysis_date} | Analysts: {selected_analysts}"
+        )
     
     request = ReportRequest(
         ticker=payload.ticker,
         analysis_date=analysis_date,
-        selected_analysts=tuple(payload.selected_analysts),
+        selected_analysts=tuple(selected_analysts),
         llm_provider=payload.llm_provider,
         deep_think_llm=payload.deep_think_llm,
         quick_think_llm=payload.quick_think_llm,
         backend_url=payload.backend_url,
         output_language=payload.output_language,
-        max_debate_rounds=payload.max_debate_rounds,
-        max_risk_discuss_rounds=payload.max_risk_discuss_rounds,
+        max_debate_rounds=max_debate_rounds,
+        max_risk_discuss_rounds=max_risk_discuss_rounds,
         checkpoint_enabled=payload.checkpoint_enabled,
         user_id=payload.user_id,
     )
