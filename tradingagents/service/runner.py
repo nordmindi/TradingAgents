@@ -94,13 +94,18 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
     env_deep_model = config.get("deep_think_llm")
     env_quick_model = config.get("quick_think_llm")
     
+    logger.debug(f"Provider detection | Request provider: {request.llm_provider} | Env provider: {env_provider}")
+    
     if request.llm_provider is None and env_provider is None:
         # Check environment variables to determine the best available provider
         openai_key = os.getenv("OPENAI_API_KEY")
         google_key = os.getenv("GOOGLE_API_KEY")
         ollama_key = os.getenv("OLLAMA_API_KEY")
         
+        logger.debug(f"API keys present | OpenAI: {bool(openai_key)} | Google: {bool(google_key)} | Ollama: {bool(ollama_key)}")
+        
         if openai_key:
+            logger.debug("Selecting OpenAI provider due to presence of OPENAI_API_KEY")
             config["llm_provider"] = "openai"
             # Use more accessible models if the default ones aren't available
             if env_deep_model in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"] or env_deep_model is None:
@@ -108,18 +113,21 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
             if env_quick_model in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"] or env_quick_model is None:
                 config["quick_think_llm"] = "gpt-4o-mini"
         elif google_key:
+            logger.debug("Selecting Google provider due to presence of GOOGLE_API_KEY")
             config["llm_provider"] = "google"
             if env_deep_model is None:
                 config["deep_think_llm"] = "gemini-2.5-flash"
             if env_quick_model is None:
                 config["quick_think_llm"] = "gemini-2.5-flash"
         elif ollama_key:
+            logger.debug("Selecting Ollama provider due to presence of OLLAMA_API_KEY")
             config["llm_provider"] = "ollama"
             if env_deep_model is None:
                 config["deep_think_llm"] = "llama3.1:8b"
             if env_quick_model is None:
                 config["quick_think_llm"] = "llama3.1:8b"
         else:
+            logger.debug("Falling back to OpenAI provider")
             # Fallback to openai but with more accessible models
             config["llm_provider"] = "openai"
             if env_deep_model is None:
@@ -128,6 +136,7 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
                 config["quick_think_llm"] = "gpt-4o-mini"
     # If provider is set via environment, ensure models are compatible
     elif env_provider is not None and request.llm_provider is None:
+        logger.debug(f"Using environment-configured provider: {env_provider}")
         if env_provider == "ollama":
             # For Ollama, set appropriate defaults if models aren't set or are incompatible
             if request.deep_think_llm is None and env_deep_model is None:
