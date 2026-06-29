@@ -155,11 +155,25 @@ def _execute_job(record: JobRecord) -> ReportResult:
         record.completed_at = datetime.now()
         duration = (record.completed_at - record.started_at).total_seconds()
         
-        logger.error(
-            f"Job {record.job_id} failed | Duration: {duration:.2f}s | "
-            f"Error: {record.error}",
-            exc_info=True,
-        )
+        # Check if this is a quota error from OpenAI
+        if "insufficient_quota" in record.error:
+            user_friendly_error = "Service temporarily unavailable due to API quota limits. Please try again later or contact support."
+            logger.error(
+                f"Job {record.job_id} failed due to API quota limits | Duration: {duration:.2f}s"
+            )
+            # Log the full error with stack trace only for debugging
+            logger.debug(
+                f"Quota error details: {record.error}",
+                exc_info=True,
+            )
+            # Update the error message that will be returned to the user
+            record.error = user_friendly_error
+        else:
+            logger.error(
+                f"Job {record.job_id} failed | Duration: {duration:.2f}s | "
+                f"Error: {record.error}",
+                exc_info=True,
+            )
         raise
 
 

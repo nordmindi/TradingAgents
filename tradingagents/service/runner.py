@@ -198,8 +198,17 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
         final_state, decision = graph.propagate(ticker, request.analysis_date)
         logger.info(f"Propagation completed | Job: {job_id} | Decision: {decision}")
     except Exception as exc:
-        logger.error(f"Propagation failed | Job: {job_id} | Error: {str(exc)}", exc_info=True)
-        raise
+        error_msg = str(exc)
+        # Check if this is a quota error from OpenAI
+        if "insufficient_quota" in error_msg:
+            user_friendly_error = "Service temporarily unavailable due to API quota limits. Please try again later or contact support."
+            logger.error(f"Propagation failed due to API quota limits | Job: {job_id}")
+            # Log the full error with stack trace only for debugging
+            logger.debug(f"Quota error details: {error_msg}", exc_info=True)
+            raise Exception(user_friendly_error) from None
+        else:
+            logger.error(f"Propagation failed | Job: {job_id} | Error: {error_msg}", exc_info=True)
+            raise
 
     report_root = Path(os.getenv("TRADINGAGENTS_SERVICE_REPORTS_DIR", "reports/api")).resolve()
     report_dir = report_root / job_id
