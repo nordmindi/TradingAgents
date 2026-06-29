@@ -30,7 +30,7 @@ def create_portfolio_manager(llm):
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
         research_plan = state["investment_plan"]
-        trader_plan = state["trader_investment_plan"]
+        trader_context = state["trader_investment_plan"]
 
         past_context = state.get("past_context", "")
         lessons_line = (
@@ -51,17 +51,22 @@ def create_portfolio_manager(llm):
 - **Hold**: Maintain current position, no action needed
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit position or avoid entry
+- **Insufficient Evidence**: Do not recommend a transaction because core evidence is stale, missing, unauditable, or internally unsupported
 
 **Context:**
-- Research Manager's investment plan: **{research_plan}**
-- Trader's transaction proposal: **{trader_plan}**
+- Research Manager's evidence synthesis: **{research_plan}**
+- Trader's execution context: **{trader_context}**
 {lessons_line}
 **Risk Analysts Debate History:**
 {history}
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+Use only canonical evidence available in the current analyst reports, research synthesis, trader context, and risk debate.
+Treat research and trader text as non-final context, not as transaction authority.
+Prefer Insufficient Evidence over any directional rating when market data are stale, current fundamentals are missing, metrics are not present in the active report, historical lessons are not auditable, or a price target lacks a documented valuation method.
+Do not infer institutional buying, accumulation, distribution, or divergence unless those claims are explicitly validated in the current evidence.
+Ground every conclusion in specific verified evidence from the current run.{get_language_instruction()}"""
 
         final_trade_decision = invoke_structured_or_freetext(
             structured_llm,

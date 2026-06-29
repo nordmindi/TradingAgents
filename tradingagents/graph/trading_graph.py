@@ -24,6 +24,7 @@ from tradingagents.agents.utils.agent_states import (
     RiskDebateState,
 )
 from tradingagents.dataflows.config import set_config
+from tradingagents.validation import check_market_data_freshness, resolve_instrument
 
 # Import the new abstract tool methods from agent_utils
 from tradingagents.agents.utils.agent_utils import (
@@ -326,6 +327,7 @@ class TradingAgentsGraph:
             final_state = self.graph.invoke(init_agent_state, **args)
 
         # Store current state for reflection.
+        self._attach_publication_metadata(final_state, company_name, trade_date)
         self.curr_state = final_state
 
         # Log state to disk.
@@ -345,6 +347,23 @@ class TradingAgentsGraph:
             )
 
         return final_state, self.process_signal(final_state["final_trade_decision"])
+
+    def _attach_publication_metadata(self, final_state: dict, company_name: str, trade_date: str) -> None:
+        """Attach best-effort publication metadata used by validation gates."""
+        if not self.config.get("publication_metadata_enabled", False):
+            return
+
+        instrument_resolution = resolve_instrument(company_name)
+        market_data_freshness = check_market_data_freshness(
+            company_name,
+            trade_date,
+            max_completed_sessions_old=int(
+                self.config.get("market_data_max_completed_sessions_old", 2)
+            ),
+        )
+
+        final_state["instrument_resolution"] = instrument_resolution.model_dump(mode="json")
+        final_state["market_data_freshness"] = market_data_freshness.model_dump(mode="json")
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
@@ -376,6 +395,8 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
+            "instrument_resolution": final_state.get("instrument_resolution"),
+            "market_data_freshness": final_state.get("market_data_freshness"),
         }
 
         # Save to file
@@ -386,7 +407,16 @@ class TradingAgentsGraph:
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(self.log_states_dict[str(trade_date)], f, indent=4)
 
-    def save_reports(self, final_state, ticker, save_path=None) -> Path:
+    def save_reports(
+        self,
+        final_state,
+        ticker,
+        save_path=None,
+        *,
+        validation_result=None,
+        dashboard_model=None,
+        expected_analysts=None,
+    ) -> Path:
         """Write the markdown report tree for a completed run, like the CLI does.
 
         Programmatic callers get the same on-disk reports the CLI produces. Pass
@@ -402,7 +432,15 @@ class TradingAgentsGraph:
                 / "reports"
                 / f"{safe_ticker_component(ticker)}_{stamp}"
             )
-        return write_report_tree(final_state, ticker, save_path)
+        return write_report_tree(
+            final_state,
+            ticker,
+            save_path,
+            validation_result=validation_result,
+            dashboard_model=dashboard_model,
+            expected_analysts=expected_analysts,
+            strict_validation=bool(self.config.get("strict_report_validation")),
+        )
 
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""

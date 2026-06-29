@@ -10,14 +10,78 @@ from __future__ import annotations
 
 import datetime as dt
 import importlib.util
+import json
 from pathlib import Path
 from typing import Any
 
+from tradingagents.validation import DashboardModel, ValidationResult, build_dashboard_model, validate_final_state
 
-def write_report_tree(final_state: dict, ticker: str, save_path) -> Path:
+
+def finalize_validation_artifacts(
+    final_state: dict,
+    *,
+    validation_result: ValidationResult | None = None,
+    dashboard_model: DashboardModel | None = None,
+    expected_analysts: tuple[str, ...] | list[str] | None = None,
+    strict_validation: bool = False,
+) -> tuple[ValidationResult, DashboardModel]:
+    """Build and validate publication artifacts in final-gate order."""
+    if validation_result is None:
+        validation_result = validate_final_state(
+            final_state,
+            expected_analysts=expected_analysts,
+            strict_mode=strict_validation,
+        )
+
+    dashboard_model = dashboard_model or build_dashboard_model(final_state, validation_result)
+    final_state["dashboard_model"] = dashboard_model.model_dump(mode="json")
+    validation_result = validate_final_state(
+        final_state,
+        expected_analysts=expected_analysts,
+        strict_mode=strict_validation,
+    )
+
+    rebuilt_dashboard = build_dashboard_model(final_state, validation_result)
+    if rebuilt_dashboard != dashboard_model:
+        dashboard_model = rebuilt_dashboard
+        final_state["dashboard_model"] = dashboard_model.model_dump(mode="json")
+        validation_result = validate_final_state(
+            final_state,
+            expected_analysts=expected_analysts,
+            strict_mode=strict_validation,
+        )
+
+    return validation_result, dashboard_model
+
+
+def write_report_tree(
+    final_state: dict,
+    ticker: str,
+    save_path,
+    *,
+    validation_result: ValidationResult | None = None,
+    dashboard_model: DashboardModel | None = None,
+    expected_analysts: tuple[str, ...] | list[str] | None = None,
+    strict_validation: bool = False,
+) -> Path:
     """Save a completed run's reports to ``save_path``; return the complete-report path."""
     save_path = Path(save_path)
     save_path.mkdir(parents=True, exist_ok=True)
+
+    validation_result, dashboard_model = finalize_validation_artifacts(
+        final_state,
+        validation_result=validation_result,
+        dashboard_model=dashboard_model,
+        expected_analysts=expected_analysts,
+        strict_validation=strict_validation,
+    )
+    write_validation_report(save_path, validation_result)
+    write_dashboard_report(save_path, dashboard_model)
+
+    if strict_validation and validation_result.has_blocking_issues:
+        codes = ", ".join(issue.code for issue in validation_result.blocking_issues)
+        raise ValueError(f"Report validation blocked publication: {codes}")
+
     sections = []
 
     # 1. Analysts
@@ -111,7 +175,14 @@ def save_report_to_disk(final_state: dict[str, Any], ticker: str, save_path: Pat
     return write_report_tree(final_state, ticker, save_path)
 
 
-def generate_pdf_from_markdown(md_path: Path, ticker: str, output_path: Path) -> Path:
+def generate_pdf_from_markdown(
+    md_path: Path,
+    ticker: str,
+    output_path: Path,
+    *,
+    validation_result: ValidationResult | None = None,
+    dashboard_model: DashboardModel | None = None,
+) -> Path:
     """Generate a PDF report from an existing markdown report."""
     MarkdownPDFGenerator = _load_markdown_pdf_generator()
 
@@ -121,11 +192,35 @@ def generate_pdf_from_markdown(md_path: Path, ticker: str, output_path: Path) ->
     generator = MarkdownPDFGenerator(
         ticker=ticker,
         date_str=dt.datetime.now().strftime("%B %d, %Y"),
+        status_label=(
+            validation_result.status_label
+            if validation_result is not None
+            else "RESEARCH_OUTPUT"
+        ),
     )
-    generator.add_highlights_page(content)
+    generator.add_highlights_page(
+        content,
+        dashboard_metrics=dashboard_model.pdf_metrics() if dashboard_model is not None else None,
+    )
     generator.add_markdown_content(content)
     generator.save(str(output_path))
     return output_path
+
+
+def write_validation_report(save_path: Path, validation_result: ValidationResult) -> None:
+    report_path = save_path / "validation_report.json"
+    report_path.write_text(
+        json.dumps(validation_result.model_dump(mode="json"), indent=2),
+        encoding="utf-8",
+    )
+
+
+def write_dashboard_report(save_path: Path, dashboard_model: DashboardModel) -> None:
+    report_path = save_path / "dashboard.json"
+    report_path.write_text(
+        json.dumps(dashboard_model.model_dump(mode="json"), indent=2),
+        encoding="utf-8",
+    )
 
 
 def _load_markdown_pdf_generator() -> type:

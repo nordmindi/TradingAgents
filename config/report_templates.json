@@ -1,10 +1,55 @@
 {
+  "presentation_defaults": {
+    "page": {
+      "format": "A4",
+      "orientation": "portrait",
+      "margins_mm": {
+        "top": 22,
+        "right": 17,
+        "bottom": 20,
+        "left": 17
+      }
+    },
+    "typography": {
+      "font_family": "Helvetica",
+      "title_size": 29,
+      "section_size": 13,
+      "body_size": 9.5,
+      "caption_size": 7.5,
+      "line_height": 1.35
+    },
+    "palette": {
+      "navy_dark": "#0F2344",
+      "navy": "#183660",
+      "teal": "#0D9488",
+      "blue": "#2563EB",
+      "amber": "#D97706",
+      "red": "#BE123C",
+      "ink": "#111827",
+      "muted": "#64748B",
+      "surface": "#F8FAFC",
+      "surface_alt": "#F1F5F9",
+      "border": "#E2E8F0",
+      "white": "#FFFFFF"
+    },
+    "layout": {
+      "dashboard_columns": 2,
+      "dashboard_card_height_mm": 31,
+      "dashboard_card_gap_mm": 8,
+      "section_spacing_mm": 7,
+      "paragraph_spacing_mm": 1.2,
+      "table_row_height_mm": 7
+    }
+  },
   "report_templates": {
     "mining_gold_focus": {
       "name": "Mining & Gold Sector Report",
       "description": "Focused analysis on gold and mining stocks",
+      "report_profile": "Sector-focused commodity equity review",
+      "accent_color": "#D97706",
       "tickers": ["GOLD", "NEM", "WPM", "FNV", "AEM", "KL", "GFI", "RGLD"],
       "categories": ["MINING_GOLD", "COMMODITIES"],
+      "sections": ["Executive Dashboard", "Commodity Backdrop", "Company Signals", "Risk Summary"],
       "weight_sentiment": 0.4,
       "weight_price": 0.3,
       "weight_social": 0.2,
@@ -14,12 +59,14 @@
         "sentiment_spike_threshold": 0.5
       }
     },
-    
     "tech_stocks": {
       "name": "Technology Stocks Report",
-      "description": "Analysis of major tech companies",
+      "description": "Analysis of major technology companies",
+      "report_profile": "Large-cap technology equity review",
+      "accent_color": "#2563EB",
       "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "AMD", "INTC"],
       "categories": ["TECH_STOCKS", "GENERAL_MARKETS"],
+      "sections": ["Executive Dashboard", "Market Structure", "Fundamentals", "Catalysts", "Risk Summary"],
       "weight_sentiment": 0.35,
       "weight_price": 0.35,
       "weight_social": 0.2,
@@ -29,12 +76,14 @@
         "sentiment_spike_threshold": 0.4
       }
     },
-    
     "crypto_focus": {
       "name": "Cryptocurrency Report",
       "description": "Crypto market sentiment and price analysis",
+      "report_profile": "Digital-asset market review",
+      "accent_color": "#7C3AED",
       "tickers": ["BTC", "ETH", "XRP", "ADA", "SOL", "DOT", "LINK", "MATIC", "AVAX"],
       "categories": ["CRYPTO", "GENERAL_MARKETS"],
+      "sections": ["Executive Dashboard", "Market Structure", "Liquidity", "Sentiment", "Risk Summary"],
       "weight_sentiment": 0.5,
       "weight_price": 0.3,
       "weight_social": 0.15,
@@ -44,12 +93,14 @@
         "sentiment_spike_threshold": 0.6
       }
     },
-    
     "forex_trading": {
       "name": "Forex Trading Report",
       "description": "Currency pair analysis",
+      "report_profile": "Macro and currency-market review",
+      "accent_color": "#0D9488",
       "tickers": ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "EURSEK", "USDSEK"],
       "categories": ["FOREX", "GENERAL_MARKETS"],
+      "sections": ["Executive Dashboard", "Macro Drivers", "Technical Context", "Volatility", "Risk Summary"],
       "weight_sentiment": 0.3,
       "weight_price": 0.4,
       "weight_social": 0.2,
@@ -59,12 +110,14 @@
         "sentiment_spike_threshold": 0.3
       }
     },
-    
     "commodities": {
       "name": "Commodities Report",
       "description": "Raw materials and commodity analysis",
+      "report_profile": "Cross-commodity market review",
+      "accent_color": "#D97706",
       "tickers": ["GOLD", "SILVER", "COPPER", "OIL", "NATGAS", "WHEAT", "CORN", "COTTON", "COFFEE"],
       "categories": ["COMMODITIES", "MINING_GOLD"],
+      "sections": ["Executive Dashboard", "Commodity Backdrop", "Supply/Demand Notes", "Technical Context", "Risk Summary"],
       "weight_sentiment": 0.35,
       "weight_price": 0.35,
       "weight_social": 0.2,
@@ -74,12 +127,14 @@
         "sentiment_spike_threshold": 0.45
       }
     },
-    
     "junior_miners": {
       "name": "Junior Mining Companies",
       "description": "Analysis of small-cap mining stocks",
+      "report_profile": "High-risk small-cap resource equity review",
+      "accent_color": "#BE123C",
       "tickers": ["GWM", "NFG", "LAB", "GOT", "VGCX", "SKE", "AU", "CXB"],
       "categories": ["CANADIAN_MARKETS", "MINING_GOLD"],
+      "sections": ["Executive Dashboard", "Project Status", "Financing/Liquidity", "News Flow", "Risk Summary"],
       "weight_sentiment": 0.25,
       "weight_price": 0.25,
       "weight_social": 0.25,
@@ -89,12 +144,14 @@
         "sentiment_spike_threshold": 0.7
       }
     },
-    
     "broad_market": {
       "name": "Broad Market Overview",
-      "description": "Comprehensive market analysis across sectors",
+      "description": "Market analysis across major sectors and macro instruments",
+      "report_profile": "Cross-asset market overview",
+      "accent_color": "#183660",
       "tickers": ["SPY", "QQQ", "IWM", "DIA", "VIX", "GLD", "SLV", "USO"],
       "categories": ["GENERAL_MARKETS", "TECH_STOCKS", "COMMODITIES", "FOREX"],
+      "sections": ["Executive Dashboard", "Index Context", "Cross-Asset Signals", "Macro News", "Risk Summary"],
       "weight_sentiment": 0.3,
       "weight_price": 0.3,
       "weight_social": 0.25,
@@ -104,12 +161,14 @@
         "sentiment_spike_threshold": 0.4
       }
     },
-    
     "meme_stocks": {
       "name": "Meme Stocks Tracker",
       "description": "Social sentiment for high-interest stocks",
+      "report_profile": "High-volatility sentiment-driven equity review",
+      "accent_color": "#BE123C",
       "tickers": ["GME", "AMC", "PLTR", "BB", "NOK", "CLOV", "WISH", "SOFI"],
       "categories": ["TECH_STOCKS", "GENERAL_MARKETS"],
+      "sections": ["Executive Dashboard", "Social Attention", "Price/Volume Context", "News Flow", "Risk Summary"],
       "weight_sentiment": 0.45,
       "weight_social": 0.35,
       "weight_price": 0.15,
@@ -120,13 +179,15 @@
       }
     }
   },
-  
   "custom_report": {
-    "description": "Create custom report by specifying tickers and categories",
+    "description": "Create a custom report by specifying tickers, categories, and optional presentation metadata.",
     "example": {
       "name": "My Custom Portfolio",
+      "report_profile": "Portfolio watchlist review",
+      "accent_color": "#2563EB",
       "tickers": ["AAPL", "TSLA", "BTC", "GOLD"],
       "categories": ["TECH_STOCKS", "CRYPTO", "COMMODITIES"],
+      "sections": ["Executive Dashboard", "Market Context", "Instrument Notes", "Risk Summary"],
       "weights": {
         "sentiment": 0.4,
         "price": 0.3,

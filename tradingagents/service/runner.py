@@ -12,7 +12,12 @@ from dotenv import load_dotenv
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.reporting import generate_pdf_from_markdown
+from tradingagents.reporting import (
+    finalize_validation_artifacts,
+    generate_pdf_from_markdown,
+    write_dashboard_report,
+    write_validation_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -198,9 +203,29 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
 
     report_root = Path(os.getenv("TRADINGAGENTS_SERVICE_REPORTS_DIR", "reports/api")).resolve()
     report_dir = report_root / job_id
+
+    strict_validation = bool(config.get("strict_report_validation"))
+    validation_result, dashboard_model = finalize_validation_artifacts(
+        final_state,
+        expected_analysts=request.selected_analysts,
+        strict_validation=strict_validation,
+    )
+    if strict_validation and validation_result.has_blocking_issues:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        write_validation_report(report_dir, validation_result)
+        write_dashboard_report(report_dir, dashboard_model)
+        codes = ", ".join(issue.code for issue in validation_result.blocking_issues)
+        raise ValueError(f"Report validation blocked publication: {codes}")
     
     logger.info(f"Saving report to disk | Job: {job_id} | Directory: {report_dir}")
-    markdown_path = graph.save_reports(final_state, ticker, report_dir)
+    markdown_path = graph.save_reports(
+        final_state,
+        ticker,
+        report_dir,
+        validation_result=validation_result,
+        dashboard_model=dashboard_model,
+        expected_analysts=request.selected_analysts,
+    )
     logger.info(f"Markdown report saved | Job: {job_id} | Path: {markdown_path}")
     
     logger.info(f"Generating PDF | Job: {job_id} | Ticker: {ticker}")
@@ -208,6 +233,8 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
         markdown_path,
         ticker,
         report_dir / f"TradingAgents_Report_{ticker}_{job_id}.pdf",
+        validation_result=validation_result,
+        dashboard_model=dashboard_model,
     )
     logger.info(f"PDF generated | Job: {job_id} | Path: {pdf_path}")
 

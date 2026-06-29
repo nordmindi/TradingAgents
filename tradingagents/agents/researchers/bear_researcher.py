@@ -12,15 +12,15 @@ def create_bear_researcher(llm):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
-        prompt = f"""You are a Bear Analyst making the case against investing in the stock. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
+        prompt = f"""You are the Bear Evidence Reviewer. Your task is to identify supported downside evidence without turning missing or weak evidence into a recommendation. Prefer a short, incomplete but fully supported review over a comprehensive review containing unsupported claims.
 
 Key points to focus on:
 
-- Risks and Challenges: Highlight factors like market saturation, financial instability, or macroeconomic threats that could hinder the stock's performance.
-- Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning, declining innovation, or threats from competitors.
-- Negative Indicators: Use evidence from financial data, market trends, or recent adverse news to support your position.
-- Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
-- Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
+- Risks and Challenges: Note only risks directly supported by the provided reports.
+- Competitive Weaknesses: Include only vulnerabilities evidenced in the current report set.
+- Negative Indicators: Use financial data, market trends, or adverse news only when present in the source reports.
+- Bull Counterpoints: Identify which bull claims are contradicted by evidence and which remain unresolved.
+- Evidence Limits: State when downside evidence is missing, stale, or insufficient. Do not infer institutional flows, divergence, or metrics that are not explicitly present and validated.
 
 Resources available:
 
@@ -30,7 +30,7 @@ Latest world affairs news: {news_report}
 Company fundamentals report: {fundamentals_report}
 Conversation history of the debate: {history}
 Last bull argument: {current_response}
-Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the stock.
+Use this information to produce a neutral downside evidence review. Do not recommend a transaction, do not provide a rating, and do not fill evidence gaps with assumptions.
 """
 
         response = llm.invoke(prompt)

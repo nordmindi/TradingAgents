@@ -152,8 +152,8 @@ def main() -> int:
     #    section headers so downstream consumers (memory log, CLI display,
     #    saved reports) keep working.
     checks = [
-        ("Research Manager", investment_plan, ["**Recommendation**:"]),
-        ("Trader",           trader_plan,     ["**Action**:", "FINAL TRANSACTION PROPOSAL:"]),
+        ("Research Manager", investment_plan, ["**Evidence Balance**:", "**Trader Context**:"]),
+        ("Trader",           trader_plan,     ["**Execution Bias**:"]),
         ("Portfolio Manager", final_decision, ["**Rating**:", "**Executive Summary**:", "**Investment Thesis**:"]),
     ]
     print("\n" + "=" * 70 + "\nStructure checks\n" + "=" * 70)

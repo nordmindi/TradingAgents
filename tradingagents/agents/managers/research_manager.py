@@ -1,4 +1,4 @@
-"""Research Manager: turns the bull/bear debate into a structured investment plan for the trader."""
+"""Research Manager: turns the bull/bear debate into non-final research synthesis."""
 
 from __future__ import annotations
 
@@ -19,20 +19,20 @@ def create_research_manager(llm):
 
         investment_debate_state = state["investment_debate_state"]
 
-        prompt = f"""As the Research Manager and debate facilitator, your role is to critically evaluate this round of debate and deliver a clear, actionable investment plan for the trader.
+        prompt = f"""As the Research Manager and debate facilitator, your role is to critically evaluate this round of debate and deliver a non-final research synthesis for the trader.
 
 {instrument_context}
 
 ---
 
-**Rating Scale** (use exactly one):
-- **Buy**: Strong conviction in the bull thesis; recommend taking or growing the position
-- **Overweight**: Constructive view; recommend gradually increasing exposure
-- **Hold**: Balanced view; recommend maintaining the current position
-- **Underweight**: Cautious view; recommend trimming exposure
-- **Sell**: Strong conviction in the bear thesis; recommend exiting or avoiding the position
+**Evidence Balance Scale** (use exactly one):
+- **Bull case stronger**: Supported bull evidence is materially stronger than bear evidence
+- **Balanced**: Supported evidence is mixed or roughly balanced
+- **Bear case stronger**: Supported bear evidence is materially stronger than bull evidence
+- **Insufficient evidence**: The debate lacks enough verified evidence for later decision review
 
-Commit to a clear stance whenever the debate's strongest arguments warrant one; reserve Hold for situations where the evidence on both sides is genuinely balanced.
+Do not issue Buy, Sell, Hold, Overweight, Underweight, or any other investment recommendation.
+Do not instruct the trader to execute a transaction. Summarize evidence, uncertainty, and non-final execution context only.
 
 ---
 

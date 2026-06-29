@@ -13,9 +13,9 @@ import pytest
 
 from tradingagents.agents.managers.research_manager import create_research_manager
 from tradingagents.agents.schemas import (
-    PortfolioRating,
+    EvidenceBalance,
+    ExecutionBias,
     ResearchPlan,
-    TraderAction,
     TraderProposal,
     render_research_plan,
     render_trader_proposal,
@@ -31,60 +31,70 @@ from tradingagents.agents.trader.trader import create_trader
 @pytest.mark.unit
 class TestRenderTraderProposal:
     def test_minimal_required_fields(self):
-        p = TraderProposal(action=TraderAction.HOLD, reasoning="Balanced setup; no edge.")
+        p = TraderProposal(execution_bias=ExecutionBias.NEUTRAL, reasoning="Balanced setup; no edge.")
         md = render_trader_proposal(p)
-        assert "**Action**: Hold" in md
+        assert "**Execution Bias**: Neutral" in md
         assert "**Reasoning**: Balanced setup; no edge." in md
-        # The trailing FINAL TRANSACTION PROPOSAL line is preserved for the
-        # analyst stop-signal text and any external code that greps for it.
-        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in md
+        assert "**Action**:" not in md
+        assert "FINAL TRANSACTION PROPOSAL" not in md
 
     def test_optional_fields_included_when_present(self):
         p = TraderProposal(
-            action=TraderAction.BUY,
+            execution_bias=ExecutionBias.CONSTRUCTIVE,
             reasoning="Strong technicals + fundamentals.",
-            entry_price=189.5,
-            stop_loss=178.0,
-            position_sizing="6% of portfolio",
+            entry_context="Watch for confirmation near support.",
+            risk_context="Event risk remains elevated.",
+            sizing_context="Sizing should account for volatility.",
         )
         md = render_trader_proposal(p)
-        assert "**Action**: Buy" in md
-        assert "**Entry Price**: 189.5" in md
-        assert "**Stop Loss**: 178.0" in md
-        assert "**Position Sizing**: 6% of portfolio" in md
-        assert "FINAL TRANSACTION PROPOSAL: **BUY**" in md
+        assert "**Execution Bias**: Constructive" in md
+        assert "**Entry Context**: Watch for confirmation near support." in md
+        assert "**Risk Context**: Event risk remains elevated." in md
+        assert "**Sizing Context**: Sizing should account for volatility." in md
+        assert "**Action**:" not in md
+        assert "FINAL TRANSACTION PROPOSAL" not in md
 
     def test_optional_fields_omitted_when_absent(self):
-        p = TraderProposal(action=TraderAction.SELL, reasoning="Guidance cut.")
+        p = TraderProposal(execution_bias=ExecutionBias.DEFENSIVE, reasoning="Guidance risk.")
         md = render_trader_proposal(p)
-        assert "Entry Price" not in md
-        assert "Stop Loss" not in md
-        assert "Position Sizing" not in md
-        assert "FINAL TRANSACTION PROPOSAL: **SELL**" in md
+        assert "Entry Context" not in md
+        assert "Risk Context" not in md
+        assert "Sizing Context" not in md
+        assert "**Action**:" not in md
+        assert "FINAL TRANSACTION PROPOSAL" not in md
 
 
 @pytest.mark.unit
 class TestRenderResearchPlan:
     def test_required_fields(self):
         p = ResearchPlan(
-            recommendation=PortfolioRating.OVERWEIGHT,
-            rationale="Bull case carried; tailwinds intact.",
-            strategic_actions="Build position over two weeks; cap at 5%.",
+            evidence_balance=EvidenceBalance.BULL_CASE_STRONGER,
+            bull_case_summary="Tailwinds intact.",
+            bear_case_summary="Valuation risk remains.",
+            uncertainties=["Await updated guidance."],
+            decision_permitted=True,
+            trader_context="Constructive context, but not a recommendation.",
         )
         md = render_research_plan(p)
-        assert "**Recommendation**: Overweight" in md
-        assert "**Rationale**: Bull case carried" in md
-        assert "**Strategic Actions**: Build position" in md
+        assert "**Evidence Balance**: Bull case stronger" in md
+        assert "**Bull Case Summary**: Tailwinds intact." in md
+        assert "**Bear Case Summary**: Valuation risk remains." in md
+        assert "**Decision Permitted**: Yes" in md
+        assert "- Await updated guidance." in md
+        assert "**Recommendation**:" not in md
 
-    def test_all_5_tier_ratings_render(self):
-        for rating in PortfolioRating:
+    def test_all_evidence_balance_values_render(self):
+        for balance in EvidenceBalance:
             p = ResearchPlan(
-                recommendation=rating,
-                rationale="r",
-                strategic_actions="s",
+                evidence_balance=balance,
+                bull_case_summary="bull",
+                bear_case_summary="bear",
+                uncertainties=[],
+                decision_permitted=True,
+                trader_context="context",
             )
             md = render_research_plan(p)
-            assert f"**Recommendation**: {rating.value}" in md
+            assert f"**Evidence Balance**: {balance.value}" in md
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +105,7 @@ class TestRenderResearchPlan:
 def _make_trader_state():
     return {
         "company_of_interest": "NVDA",
-        "investment_plan": "**Recommendation**: Buy\n**Rationale**: ...\n**Strategic Actions**: ...",
+        "investment_plan": "**Evidence Balance**: Bull case stronger\n**Trader Context**: ...",
     }
 
 
@@ -105,7 +115,7 @@ def _structured_trader_llm(captured: dict, proposal: TraderProposal | None = Non
     """
     if proposal is None:
         proposal = TraderProposal(
-            action=TraderAction.BUY,
+            execution_bias=ExecutionBias.CONSTRUCTIVE,
             reasoning="Strong setup.",
         )
     structured = MagicMock()
@@ -122,19 +132,20 @@ class TestTraderAgent:
     def test_structured_path_produces_rendered_markdown(self):
         captured = {}
         proposal = TraderProposal(
-            action=TraderAction.BUY,
+            execution_bias=ExecutionBias.CONSTRUCTIVE,
             reasoning="AI capex cycle intact; institutional flows constructive.",
-            entry_price=189.5,
-            stop_loss=178.0,
-            position_sizing="6% of portfolio",
+            entry_context="Watch for confirmation near support.",
+            risk_context="Volatility remains elevated.",
+            sizing_context="Sizing should reflect liquidity and event risk.",
         )
         llm = _structured_trader_llm(captured, proposal)
         trader = create_trader(llm)
         result = trader(_make_trader_state())
         plan = result["trader_investment_plan"]
-        assert "**Action**: Buy" in plan
-        assert "**Entry Price**: 189.5" in plan
-        assert "FINAL TRANSACTION PROPOSAL: **BUY**" in plan
+        assert "**Execution Bias**: Constructive" in plan
+        assert "**Entry Context**: Watch for confirmation near support." in plan
+        assert "**Action**:" not in plan
+        assert "FINAL TRANSACTION PROPOSAL" not in plan
         # The same rendered markdown is also added to messages for downstream agents.
         assert plan in result["messages"][0].content
 
@@ -143,14 +154,13 @@ class TestTraderAgent:
         llm = _structured_trader_llm(captured)
         trader = create_trader(llm)
         trader(_make_trader_state())
-        # The investment plan is in the user message of the captured prompt.
+        # The research synthesis is in the user message of the captured prompt.
         prompt = captured["prompt"]
-        assert any("Proposed Investment Plan" in m["content"] for m in prompt)
+        assert any("Research Synthesis" in m["content"] for m in prompt)
 
     def test_falls_back_to_freetext_when_structured_unavailable(self):
         plain_response = (
-            "**Action**: Sell\n\nGuidance cut hits margins.\n\n"
-            "FINAL TRANSACTION PROPOSAL: **SELL**"
+            "**Execution Bias**: Defensive\n\nGuidance risk affects execution context."
         )
         llm = MagicMock()
         llm.with_structured_output.side_effect = NotImplementedError("provider unsupported")
@@ -182,9 +192,12 @@ def _make_rm_state():
 def _structured_rm_llm(captured: dict, plan: ResearchPlan | None = None):
     if plan is None:
         plan = ResearchPlan(
-            recommendation=PortfolioRating.HOLD,
-            rationale="Balanced view across both sides.",
-            strategic_actions="Hold current position; reassess after earnings.",
+            evidence_balance=EvidenceBalance.BALANCED,
+            bull_case_summary="Bull says...",
+            bear_case_summary="Bear says...",
+            uncertainties=["Need fresh data."],
+            decision_permitted=True,
+            trader_context="Neutral execution context.",
         )
     structured = MagicMock()
     structured.invoke.side_effect = lambda prompt: (
@@ -200,30 +213,36 @@ class TestResearchManagerAgent:
     def test_structured_path_produces_rendered_markdown(self):
         captured = {}
         plan = ResearchPlan(
-            recommendation=PortfolioRating.OVERWEIGHT,
-            rationale="Bull case is stronger; AI tailwind intact.",
-            strategic_actions="Build position gradually over two weeks.",
+            evidence_balance=EvidenceBalance.BULL_CASE_STRONGER,
+            bull_case_summary="AI tailwind intact.",
+            bear_case_summary="Valuation risk remains.",
+            uncertainties=[],
+            decision_permitted=True,
+            trader_context="Constructive context, no recommendation.",
         )
         llm = _structured_rm_llm(captured, plan)
         rm = create_research_manager(llm)
         result = rm(_make_rm_state())
         ip = result["investment_plan"]
-        assert "**Recommendation**: Overweight" in ip
-        assert "**Rationale**: Bull case" in ip
-        assert "**Strategic Actions**: Build position" in ip
+        assert "**Evidence Balance**: Bull case stronger" in ip
+        assert "**Bull Case Summary**: AI tailwind" in ip
+        assert "**Trader Context**: Constructive context" in ip
+        assert "**Recommendation**:" not in ip
 
-    def test_prompt_uses_5_tier_rating_scale(self):
-        """The RM prompt must list all five tiers so the schema enum matches user expectations."""
+    def test_prompt_uses_evidence_balance_scale(self):
+        """The RM prompt must list evidence-balance values and avoid rating instructions."""
         captured = {}
         llm = _structured_rm_llm(captured)
         rm = create_research_manager(llm)
         rm(_make_rm_state())
         prompt = captured["prompt"]
-        for tier in ("Buy", "Overweight", "Hold", "Underweight", "Sell"):
-            assert f"**{tier}**" in prompt, f"missing {tier} in prompt"
+        for balance in ("Bull case stronger", "Balanced", "Bear case stronger", "Insufficient evidence"):
+            assert f"**{balance}**" in prompt, f"missing {balance} in prompt"
+        assert "**Buy**" not in prompt
+        assert "**Sell**" not in prompt
 
     def test_falls_back_to_freetext_when_structured_unavailable(self):
-        plain_response = "**Recommendation**: Sell\n\n**Rationale**: ...\n\n**Strategic Actions**: ..."
+        plain_response = "**Evidence Balance**: Bear case stronger\n\n**Trader Context**: Defensive context."
         llm = MagicMock()
         llm.with_structured_output.side_effect = NotImplementedError("provider unsupported")
         llm.invoke.return_value = MagicMock(content=plain_response)

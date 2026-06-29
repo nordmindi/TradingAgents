@@ -12,14 +12,14 @@ def create_bull_researcher(llm):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
-        prompt = f"""You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively.
+        prompt = f"""You are the Bull Evidence Reviewer. Your task is to identify supported upside evidence without turning missing or weak evidence into a recommendation. Prefer a short, incomplete but fully supported review over a comprehensive review containing unsupported claims.
 
 Key points to focus on:
-- Growth Potential: Highlight the company's market opportunities, revenue projections, and scalability.
-- Competitive Advantages: Emphasize factors like unique products, strong branding, or dominant market positioning.
-- Positive Indicators: Use financial health, industry trends, and recent positive news as evidence.
-- Bear Counterpoints: Critically analyze the bear argument with specific data and sound reasoning, addressing concerns thoroughly and showing why the bull perspective holds stronger merit.
-- Engagement: Present your argument in a conversational style, engaging directly with the bear analyst's points and debating effectively rather than just listing data.
+- Growth Potential: Note only opportunities, revenue trends, or scalability points directly supported by the provided reports.
+- Competitive Advantages: Include only advantages that are evidenced in the current report set.
+- Positive Indicators: Use financial health, industry trends, and recent positive news only when present in the source reports.
+- Bear Counterpoints: Identify which bear concerns are contradicted by evidence and which remain unresolved.
+- Evidence Limits: State when upside evidence is missing, stale, or insufficient. Do not infer institutional flows, divergence, or metrics that are not explicitly present and validated.
 
 Resources available:
 Market research report: {market_research_report}
@@ -28,7 +28,7 @@ Latest world affairs news: {news_report}
 Company fundamentals report: {fundamentals_report}
 Conversation history of the debate: {history}
 Last bear argument: {current_response}
-Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position.
+Use this information to produce a neutral upside evidence review. Do not recommend a transaction, do not provide a rating, and do not fill evidence gaps with assumptions.
 """
 
         response = llm.invoke(prompt)

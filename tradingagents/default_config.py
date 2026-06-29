@@ -28,6 +28,16 @@ DEFAULT_CONFIG = {
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.
     "checkpoint_enabled": False,
+    # Report publication gate. When enabled, blocking validation issues stop
+    # Markdown/PDF publication instead of being recorded as report metadata.
+    "strict_report_validation": os.getenv("TRADINGAGENTS_STRICT_REPORT_VALIDATION", "false").lower() == "true",
+    # Collect best-effort instrument and market-data metadata for publication
+    # validation. Tests and custom minimal configs can omit this to avoid
+    # provider calls.
+    "publication_metadata_enabled": True,
+    "market_data_max_completed_sessions_old": int(
+        os.getenv("TRADINGAGENTS_MARKET_DATA_MAX_COMPLETED_SESSIONS_OLD", "2")
+    ),
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
     "output_language": "English",
