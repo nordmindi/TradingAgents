@@ -88,16 +88,25 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
     config["data_cache_dir"] = str(cache_root)
     config["memory_log_path"] = str(memory_root / "trading_memory.md")
 
-    # Auto-detect provider based on available API keys if not explicitly set
-    # Only auto-detect if neither request nor environment has set a provider
+    # Determine the final provider to use
+    # Priority: 1. Request parameter, 2. Environment variable, 3. Auto-detection
     env_provider = config.get("llm_provider")
     env_deep_model = config.get("deep_think_llm")
     env_quick_model = config.get("quick_think_llm")
     
-    logger.debug(f"Provider detection | Request provider: {request.llm_provider} | Env provider: {env_provider}")
+    logger.debug(f"Provider selection | Request provider: {request.llm_provider} | Env provider: {env_provider}")
     
-    if request.llm_provider is None and env_provider is None:
-        # Check environment variables to determine the best available provider
+    # Use request provider if specified
+    if request.llm_provider is not None:
+        config["llm_provider"] = request.llm_provider
+        logger.debug(f"Using request-specified provider: {request.llm_provider}")
+    # Use environment provider if specified and no request provider
+    elif env_provider is not None:
+        config["llm_provider"] = env_provider
+        logger.debug(f"Using environment-configured provider: {env_provider}")
+    # Auto-detect provider based on available API keys only if no provider is explicitly set
+    else:
+        logger.debug("No explicit provider set, auto-detecting based on API keys")
         openai_key = os.getenv("OPENAI_API_KEY")
         google_key = os.getenv("GOOGLE_API_KEY")
         ollama_key = os.getenv("OLLAMA_API_KEY")
@@ -105,7 +114,7 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
         logger.debug(f"API keys present | OpenAI: {bool(openai_key)} | Google: {bool(google_key)} | Ollama: {bool(ollama_key)}")
         
         if openai_key:
-            logger.debug("Selecting OpenAI provider due to presence of OPENAI_API_KEY")
+            logger.debug("Auto-selecting OpenAI provider due to presence of OPENAI_API_KEY")
             config["llm_provider"] = "openai"
             # Use more accessible models if the default ones aren't available
             if env_deep_model in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"] or env_deep_model is None:
@@ -113,14 +122,14 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
             if env_quick_model in ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"] or env_quick_model is None:
                 config["quick_think_llm"] = "gpt-4o-mini"
         elif google_key:
-            logger.debug("Selecting Google provider due to presence of GOOGLE_API_KEY")
+            logger.debug("Auto-selecting Google provider due to presence of GOOGLE_API_KEY")
             config["llm_provider"] = "google"
             if env_deep_model is None:
                 config["deep_think_llm"] = "gemini-2.5-flash"
             if env_quick_model is None:
                 config["quick_think_llm"] = "gemini-2.5-flash"
         elif ollama_key:
-            logger.debug("Selecting Ollama provider due to presence of OLLAMA_API_KEY")
+            logger.debug("Auto-selecting Ollama provider due to presence of OLLAMA_API_KEY")
             config["llm_provider"] = "ollama"
             if env_deep_model is None:
                 config["deep_think_llm"] = "llama3.1:8b"
@@ -134,27 +143,33 @@ def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
                 config["deep_think_llm"] = "gpt-4o-mini"
             if env_quick_model is None:
                 config["quick_think_llm"] = "gpt-4o-mini"
-    # If provider is set via environment, ensure models are compatible
-    elif env_provider is not None and request.llm_provider is None:
-        logger.debug(f"Using environment-configured provider: {env_provider}")
-        if env_provider == "ollama":
-            # For Ollama, set appropriate defaults if models aren't set or are incompatible
-            if request.deep_think_llm is None and env_deep_model is None:
-                config["deep_think_llm"] = "llama3.1:8b"
-            elif request.deep_think_llm is None and env_deep_model is not None:
-                # Keep the environment variable model, but log a warning if it seems incompatible
-                pass  # We'll let the user decide their model names
-            if request.quick_think_llm is None and env_quick_model is None:
-                config["quick_think_llm"] = "llama3.1:8b"
-            elif request.quick_think_llm is None and env_quick_model is not None:
-                # Keep the environment variable model
-                pass
-        elif env_provider == "google":
-            # Set Google-specific defaults if not explicitly set in request
-            if request.deep_think_llm is None and env_deep_model is None:
-                config["deep_think_llm"] = "gemini-2.5-flash"
-            if request.quick_think_llm is None and env_quick_model is None:
-                config["quick_think_llm"] = "gemini-2.5-flash"
+    
+    # Ensure models are compatible with the selected provider
+    final_provider = config["llm_provider"]
+    if final_provider == "ollama":
+        # For Ollama, set appropriate defaults if models aren't set or are incompatible
+        if request.deep_think_llm is None and env_deep_model is None:
+            config["deep_think_llm"] = "llama3.1:8b"
+        elif request.deep_think_llm is None and env_deep_model is not None and env_provider == "ollama":
+            # Keep the environment variable model for Ollama
+            pass
+        if request.quick_think_llm is None and env_quick_model is None:
+            config["quick_think_llm"] = "llama3.1:8b"
+        elif request.quick_think_llm is None and env_quick_model is not None and env_provider == "ollama":
+            # Keep the environment variable model for Ollama
+            pass
+    elif final_provider == "google":
+        # Set Google-specific defaults if not explicitly set in request
+        if request.deep_think_llm is None and env_deep_model is None:
+            config["deep_think_llm"] = "gemini-2.5-flash"
+        if request.quick_think_llm is None and env_quick_model is None:
+            config["quick_think_llm"] = "gemini-2.5-flash"
+    elif final_provider == "openai":
+        # Set OpenAI-specific defaults if not explicitly set in request
+        if request.deep_think_llm is None and env_deep_model is None:
+            config["deep_think_llm"] = "gpt-4o-mini"
+        if request.quick_think_llm is None and env_quick_model is None:
+            config["quick_think_llm"] = "gpt-4o-mini"
 
     overrides = {
         "llm_provider": request.llm_provider,
