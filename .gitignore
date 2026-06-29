@@ -221,3 +221,4 @@ __marimo__/
 # TradingAgents service data
 .tradingagents_service/
 reports/
+.tradingagents_service/
