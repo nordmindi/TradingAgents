@@ -78,7 +78,15 @@ def validate_report_request(request: ReportRequest) -> None:
 
 
 def build_config(request: ReportRequest, job_id: str) -> dict[str, Any]:
+    # Load environment variables directly to avoid import timing issues
     config = DEFAULT_CONFIG.copy()
+    
+    # Override with current environment variables to ensure we get the latest values
+    config["llm_provider"] = os.getenv("TRADINGAGENTS_LLM_PROVIDER", config["llm_provider"])
+    config["deep_think_llm"] = os.getenv("TRADINGAGENTS_DEEP_THINK_LLM", config["deep_think_llm"])
+    config["quick_think_llm"] = os.getenv("TRADINGAGENTS_QUICK_THINK_LLM", config["quick_think_llm"])
+    config["max_debate_rounds"] = int(os.getenv("TRADINGAGENTS_MAX_DEBATE_ROUNDS", config["max_debate_rounds"]))
+    config["max_risk_discuss_rounds"] = int(os.getenv("TRADINGAGENTS_MAX_RISK_DISCUSS_ROUNDS", config["max_risk_discuss_rounds"]))
 
     report_root = Path(os.getenv("TRADINGAGENTS_SERVICE_REPORTS_DIR", "reports/api")).resolve()
     cache_root = Path(os.getenv("TRADINGAGENTS_SERVICE_CACHE_DIR", ".tradingagents_service/cache")).resolve()
