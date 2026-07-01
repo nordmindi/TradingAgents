@@ -27,6 +27,9 @@
 
 # TradingAgents: Multi-Agents LLM Financial Trading Framework
 
+## Recent Fixes
+- **Asset Handling**: Fixed issue where logos were not appearing in PDF reports in production builds. Assets are now properly included in package distributions.
+
 ## News
 - [2026-04] **TradingAgents v0.2.4** released with structured-output agents (Research Manager, Trader, Portfolio Manager), LangGraph checkpoint resume, persistent decision log, DeepSeek/Qwen/GLM/Azure provider support, Docker, and a Windows UTF-8 encoding fix. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 - [2026-03] **TradingAgents v0.2.3** released with multi-language support, GPT-5.4 family models, unified model catalog, backtesting date fidelity, and proxy support.

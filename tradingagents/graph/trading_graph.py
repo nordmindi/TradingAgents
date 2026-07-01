@@ -302,10 +302,14 @@ class TradingAgentsGraph:
 
     def _run_graph(self, company_name, trade_date):
         """Execute the graph and write the resulting state to disk and memory log."""
-        # Initialize state — inject memory log context for PM.
-        past_context = self.memory_log.get_past_context(company_name)
+        # Initialize state with audited lessons only. Legacy memory prose is
+        # not supplied to the Portfolio Manager as decision evidence.
+        validated_lessons = self.memory_log.get_validated_lessons(company_name)
         init_agent_state = self.propagator.create_initial_state(
-            company_name, trade_date, past_context=past_context
+            company_name,
+            trade_date,
+            past_context="",
+            historical_lessons_evidence=validated_lessons,
         )
         args = self.propagator.get_graph_args()
 
@@ -395,8 +399,10 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
+            "historical_lessons_evidence": final_state.get("historical_lessons_evidence"),
             "instrument_resolution": final_state.get("instrument_resolution"),
             "market_data_freshness": final_state.get("market_data_freshness"),
+            "decision_evidence_bundle": final_state.get("decision_evidence_bundle"),
         }
 
         # Save to file

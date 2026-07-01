@@ -19,6 +19,7 @@ from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
+from tradingagents.validation.evidence import usable_historical_lessons
 
 
 def create_portfolio_manager(llm):
@@ -32,10 +33,11 @@ def create_portfolio_manager(llm):
         research_plan = state["investment_plan"]
         trader_context = state["trader_investment_plan"]
 
-        past_context = state.get("past_context", "")
+        validated_lessons = usable_historical_lessons(state)
         lessons_line = (
-            f"- Lessons from prior decisions and outcomes:\n{past_context}\n"
-            if past_context
+            "- Validated historical lessons available for this decision:\n"
+            f"{_format_validated_lessons(validated_lessons)}\n"
+            if validated_lessons
             else ""
         )
 
@@ -66,6 +68,7 @@ Use only canonical evidence available in the current analyst reports, research s
 Treat research and trader text as non-final context, not as transaction authority.
 Prefer Insufficient Evidence over any directional rating when market data are stale, current fundamentals are missing, metrics are not present in the active report, historical lessons are not auditable, or a price target lacks a documented valuation method.
 Do not infer institutional buying, accumulation, distribution, or divergence unless those claims are explicitly validated in the current evidence.
+Use neutral, professional, falsifiable language. Avoid hype, insults, tribal framing, inevitability wording, pressure-to-act phrasing, or phrases such as "smart money", "catastrophic", "extremely compelling", "very compelling", "clash violently", "massive mistake", "gambling", and "screaming sell signal".
 Ground every conclusion in specific verified evidence from the current run.{get_language_instruction()}"""
 
         final_trade_decision = invoke_structured_or_freetext(
@@ -95,3 +98,16 @@ Ground every conclusion in specific verified evidence from the current run.{get_
         }
 
     return portfolio_manager_node
+
+
+def _format_validated_lessons(lessons) -> str:
+    lines = []
+    for lesson in lessons:
+        lines.append(
+            "- "
+            f"{lesson.lesson_id} | {lesson.ticker} | {lesson.recommendation} | "
+            f"net_return={lesson.net_return} | alpha={lesson.alpha} | "
+            f"holding_period_sessions={lesson.holding_period_sessions} | "
+            f"sources={','.join(lesson.source_ids)}"
+        )
+    return "\n".join(lines)

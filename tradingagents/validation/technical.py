@@ -110,7 +110,7 @@ def _validate_divergence_claims(text: str, metadata: dict, location: str) -> lis
         if not _validated_event(validation, "bullish_divergence"):
             claims.append(
                 ValidationIssue(
-                    code="FALSE_DIVERGENCE_CLAIM",
+                    code="FALSE_BULLISH_DIVERGENCE_CLAIM",
                     severity="blocking",
                     location=location,
                     message=(
@@ -125,7 +125,7 @@ def _validate_divergence_claims(text: str, metadata: dict, location: str) -> lis
         if not _validated_event(validation, "bearish_divergence"):
             claims.append(
                 ValidationIssue(
-                    code="FALSE_DIVERGENCE_CLAIM",
+                    code="FALSE_BEARISH_DIVERGENCE_CLAIM",
                     severity="blocking",
                     location=location,
                     message=(
@@ -139,7 +139,7 @@ def _validate_divergence_claims(text: str, metadata: dict, location: str) -> lis
 
 
 def _validate_moving_average_claims(text: str, metadata: dict, location: str) -> list[ValidationIssue]:
-    lower_text = text.lower()
+    lower_text = _strip_cross_context_language(text).lower()
     issues = []
     cross = _as_dict(metadata.get("moving_average_cross")) or {}
 
@@ -164,6 +164,15 @@ def _validate_moving_average_claims(text: str, metadata: dict, location: str) ->
         )
 
     return issues
+
+
+def _strip_cross_context_language(text: str) -> str:
+    return re.sub(
+        r"(?i)\b(?:golden\s*/\s*death|golden\s+or\s+death|golden|death)\s+cross\s+"
+        r"(?:context|setups?|watchlist|reference)\b",
+        "",
+        text,
+    )
 
 
 def _validate_bollinger_claims(text: str, metadata: dict, location: str) -> list[ValidationIssue]:
@@ -206,7 +215,8 @@ def _validate_volume_inference_claims(
     if not re.search(
         r"(?i)\b(institutional (?:buying|selling|accumulation|distribution)|"
         r"smart money|seller exhaustion|buyer exhaustion|accumulation by funds|"
-        r"distribution by funds)\b",
+        r"distribution by funds|accumulation behavior|distribution behavior|"
+        r"buyers stepping in|funds building positions)\b",
         text,
     ):
         return []

@@ -4,10 +4,74 @@ Professional PDF report generator for compact TradingAgents summaries.
 """
 
 import os
+import re
 from datetime import datetime
-from typing import Dict
+from typing import Any, Dict, Sequence
 
 from fpdf import FPDF
+from fpdf.enums import MethodReturnValue
+
+
+DISPLAY_REPLACEMENTS = {
+    "INSUFFICIENT_EVIDENCE": "Insufficient Evidence",
+    "NO_CURRENT_TRANSACTION": "No current transaction",
+    "RESEARCH_OUTPUT": "Research Output",
+    "research_only": "Research Only",
+    "verified_with_warnings": "Verified with Warnings",
+    "close_10_ema": "10-day EMA",
+    "close_50_sma": "50-day SMA",
+    "close_200_sma": "200-day SMA",
+    "macdh": "MACD histogram",
+    "macds": "MACD signal line",
+    "macd": "MACD",
+    "boll_ub": "Bollinger upper band",
+    "boll_lb": "Bollinger lower band",
+    "boll": "Bollinger middle band",
+    "vwma": "VWMA",
+    "rsi": "RSI",
+    "atr": "ATR",
+    "ema": "EMA",
+    "sma": "SMA",
+    "ohlcv": "OHLCV",
+    "get_stock_data": "stock price data lookup",
+    "get_indicators": "technical indicator lookup",
+    "get_fundamentals": "fundamentals lookup",
+    "get_balance_sheet": "balance sheet lookup",
+    "get_cashflow": "cash flow lookup",
+    "get_income_statement": "income statement lookup",
+    "get_news": "news data lookup",
+    "get_global_news": "global news lookup",
+    "get_insider_transactions": "insider transaction lookup",
+    "dynamic S/R": "dynamic support/resistance",
+}
+
+
+def display_text(text):
+    if not text:
+        return ""
+    text = str(text)
+    text = text.replace("`", "")
+    text = text.replace("//", ":")
+    for source, replacement in DISPLAY_REPLACEMENTS.items():
+        text = re.sub(rf"(?<![A-Za-z0-9_]){re.escape(source)}(?![A-Za-z0-9_])", replacement, text)
+    text = re.sub(r"\b([a-z]+(?:_[a-z0-9]+)+)\b", _humanize_identifier_match, text)
+    text = re.sub(r"\b([A-Z]+(?:_[A-Z0-9]+)+)\b", _humanize_constant_match, text)
+    text = re.sub(r"\s+:\s+", ": ", text)
+    return text
+
+
+def _humanize_identifier_match(match):
+    value = match.group(1)
+    if value in DISPLAY_REPLACEMENTS:
+        return DISPLAY_REPLACEMENTS[value]
+    return value.replace("_", " ")
+
+
+def _humanize_constant_match(match):
+    value = match.group(1)
+    if value in DISPLAY_REPLACEMENTS:
+        return DISPLAY_REPLACEMENTS[value]
+    return value.replace("_", " ").title()
 
 
 class VeinReportPDF(FPDF):
@@ -92,7 +156,8 @@ class VeinReportPDF(FPDF):
     def clean_text(self, text):
         if not isinstance(text, str):
             text = str(text)
-        return "".join(c for c in text if ord(c) < 256).strip()
+        text = "".join(c for c in text if ord(c) < 256)
+        return display_text(text).strip()
 
     def status_color(self, value):
         text = str(value).upper()
@@ -131,6 +196,145 @@ class VeinReportPDF(FPDF):
         self.set_font("helvetica", "B", 11 if len(clean_value) <= 34 else 9)
         self.set_text_color(*self.status_color(clean_value))
         self.multi_cell(width - 10, 5.4, clean_value)
+
+    def draw_dynamic_table(self, rows: Sequence[Sequence[Any]]):
+        rows = self._normalize_table_rows(rows)
+        if not rows:
+            return
+
+        self.ln(2)
+        widths = self._table_column_widths(rows)
+        self._draw_table_row(rows[0], widths, is_header=True, fill=True)
+        for i, row in enumerate(rows[1:], start=1):
+            self._draw_table_row(row, widths, is_header=False, fill=i % 2 == 1)
+        self.ln(4)
+
+    def _normalize_table_rows(self, rows):
+        cleaned = [
+            [self.clean_text(cell) for cell in row]
+            for row in rows
+            if row is not None
+        ]
+        cleaned = [row for row in cleaned if any(cell for cell in row)]
+        if not cleaned:
+            return []
+        col_count = max(len(row) for row in cleaned)
+        return [row + [""] * (col_count - len(row)) for row in cleaned]
+
+    def _table_column_widths(self, rows):
+        col_count = len(rows[0])
+        total_width = self.content_width
+        padding = 4
+
+        body_rows = rows[1:] or rows
+        min_widths = []
+        desired_widths = []
+        for col_idx in range(col_count):
+            header = rows[0][col_idx]
+            cells = [row[col_idx] for row in body_rows]
+            all_cells = [header] + cells
+
+            self.set_font("helvetica", "B", 8.0)
+            header_width = self.get_string_width(header) + padding
+            self.set_font("helvetica", "", 8.0)
+            word_width = max(
+                [self.get_string_width(word) for cell in all_cells for word in cell.split()]
+                or [0]
+            ) + padding
+            full_width = max([self.get_string_width(cell) for cell in all_cells] or [0]) + padding
+            avg_chars = sum(len(cell) for cell in cells) / max(1, len(cells))
+
+            min_width = max(10, min(max(header_width, word_width), 44))
+            desired_cap = max(22, min(total_width * 0.58, 34 + avg_chars * 0.75))
+            desired = max(min_width, min(full_width, desired_cap))
+            min_widths.append(min_width)
+            desired_widths.append(desired)
+
+        min_total = sum(min_widths)
+        if min_total >= total_width:
+            scale = total_width / min_total
+            return [width * scale for width in min_widths]
+
+        desired_total = sum(desired_widths)
+        if desired_total <= total_width:
+            extra = total_width - desired_total
+            priorities = [
+                max(1.0, sum(len(row[col_idx]) for row in rows) / max(1, len(rows)))
+                for col_idx in range(col_count)
+            ]
+            priority_total = sum(priorities)
+            return [
+                desired_widths[i] + extra * (priorities[i] / priority_total)
+                for i in range(col_count)
+            ]
+
+        shrinkable = [desired_widths[i] - min_widths[i] for i in range(col_count)]
+        shrink_total = sum(shrinkable)
+        overflow = desired_total - total_width
+        if shrink_total <= 0:
+            return min_widths
+        return [
+            desired_widths[i] - overflow * (shrinkable[i] / shrink_total)
+            for i in range(col_count)
+        ]
+
+    def _draw_table_row(self, row, widths, *, is_header, fill):
+        font_style = "B" if is_header else ""
+        font_size = 8.0 if is_header else 7.8
+        line_height = 4.5 if is_header else 4.8
+        x0 = self.l_margin_val
+        y0 = self.get_y()
+        row_height = self._table_row_height(row, widths, font_style, font_size, line_height)
+
+        if y0 + row_height > self.page_break_trigger:
+            self.add_page()
+            y0 = self.get_y()
+
+        fill_color = self.colors["surface_alt"] if is_header else self.colors["surface"]
+        self.set_fill_color(*fill_color)
+        self.set_draw_color(*(self.colors["teal"] if is_header else self.colors["border"]))
+        self.set_line_width(0.35 if is_header else 0.2)
+
+        x = x0
+        for width in widths:
+            if fill:
+                self.rect(x, y0, width, row_height, "F")
+            x += width
+
+        self.line(x0, y0, x0 + sum(widths), y0)
+        self.line(x0, y0 + row_height, x0 + sum(widths), y0 + row_height)
+
+        x = x0
+        self.set_font("helvetica", font_style, font_size)
+        self.set_text_color(*(self.colors["navy"] if is_header else self.colors["ink"]))
+        for cell, width in zip(row, widths):
+            self.set_xy(x + 2, y0 + 2)
+            self.multi_cell(
+                max(1, width - 4),
+                line_height,
+                self.clean_text(cell),
+                border=0,
+                align="L",
+                new_x="RIGHT",
+                new_y="TOP",
+            )
+            x += width
+
+        self.set_y(y0 + row_height)
+
+    def _table_row_height(self, row, widths, font_style, font_size, line_height):
+        self.set_font("helvetica", font_style, font_size)
+        max_lines = 1
+        for cell, width in zip(row, widths):
+            lines = self.multi_cell(
+                max(1, width - 4),
+                line_height,
+                self.clean_text(cell),
+                dry_run=True,
+                output=MethodReturnValue.LINES,
+            )
+            max_lines = max(max_lines, len(lines) if lines else 1)
+        return max_lines * line_height + 4
 
 
 class PDFGenerator:
@@ -199,6 +403,15 @@ class PDFGenerator:
         pdf.section_title("Bearish Vectors", "red")
         self._render_factor_list(pdf, data.get("bear_factors", []))
 
+        for table in data.get("tables", []):
+            title = table.get("title") if isinstance(table, dict) else None
+            rows = self._table_rows_from_payload(table)
+            if not rows:
+                continue
+            if title:
+                pdf.section_title(title, "navy")
+            pdf.draw_dynamic_table(rows)
+
     def _render_factor_list(self, pdf, factors):
         if not factors:
             pdf.set_font("helvetica", "", 9.5)
@@ -216,6 +429,15 @@ class PDFGenerator:
             pdf.set_text_color(*pdf.colors["ink"])
             pdf.multi_cell(pdf.content_width - 7, 5.5, pdf.clean_text(factor))
             pdf.ln(0.5)
+
+    def _table_rows_from_payload(self, table):
+        if isinstance(table, dict):
+            rows = table.get("rows") or []
+            columns = table.get("columns")
+            if columns:
+                return [columns] + rows
+            return rows
+        return table
 
 
 if __name__ == "__main__":

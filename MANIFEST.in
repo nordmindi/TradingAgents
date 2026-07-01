@@ -1,0 +1,5 @@
+include assets/*
+include assets/**/*
+recursive-include assets *
+global-exclude *.pyc
+global-exclude __pycache__

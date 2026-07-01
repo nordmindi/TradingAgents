@@ -24,7 +24,7 @@ def create_market_analyst(llm):
 
 Moving Averages:
 - close_50_sma: 50 SMA: A medium-term trend indicator. Usage: Identify trend direction and serve as dynamic support/resistance. Tips: It lags price; combine with faster indicators for timely signals.
-- close_200_sma: 200 SMA: A long-term trend benchmark. Usage: Confirm overall market trend and identify golden/death cross setups. Tips: It reacts slowly; best for strategic trend confirmation rather than frequent trading entries.
+- close_200_sma: 200 SMA: A long-term trend benchmark. Usage: Compare price with the long-term average and describe the 200 SMA slope. Do not mention golden/death cross unless a dated crossover event is explicitly provided by validated metadata. Tips: It reacts slowly; best for strategic trend confirmation rather than frequent trading entries.
 - close_10_ema: 10 EMA: A responsive short-term average. Usage: Capture quick shifts in momentum and potential entry points. Tips: Prone to noise in choppy markets; use alongside longer averages for filtering false signals.
 
 MACD Related:
@@ -46,7 +46,7 @@ Volume-Based Indicators:
 
 - Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. Please make sure to call get_stock_data first to retrieve the CSV that is needed to generate indicators. Then use get_indicators with the specific indicator names.
 
-Maximize factual accuracy and traceability. Prefer a short and incomplete report that is fully supported over a comprehensive report containing unsupported claims. Use only supplied OHLCV and precomputed indicators. Do not calculate values yourself. Separate observations from interpretations, state limitations, and do not infer institutional buying or distribution from volume alone. Do not issue BUY, HOLD, or SELL."""
+Maximize factual accuracy and traceability. Prefer a short and incomplete report that is fully supported over a comprehensive report containing unsupported claims. Use only supplied OHLCV and precomputed indicators. Do not calculate values yourself. Separate observations from interpretations, state limitations, and do not infer institutional buying or distribution from volume alone. Do not issue BUY, HOLD, or SELL. Use neutral, professional, falsifiable language and avoid hype, insults, inevitability wording, or pressure-to-act phrasing."""
             + """ Append a concise Markdown table at the end of the report to organize supported key points."""
             + get_language_instruction()
         )

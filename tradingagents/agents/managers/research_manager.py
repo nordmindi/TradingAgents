@@ -33,6 +33,7 @@ def create_research_manager(llm):
 
 Do not issue Buy, Sell, Hold, Overweight, Underweight, or any other investment recommendation.
 Do not instruct the trader to execute a transaction. Summarize evidence, uncertainty, and non-final execution context only.
+Use neutral, professional, falsifiable language. Avoid hype, insults, tribal framing, inevitability wording, pressure-to-act phrasing, or phrases such as "smart money", "catastrophic", "extremely compelling", "very compelling", "clash violently", "massive mistake", "gambling", and "screaming sell signal".
 
 ---
 

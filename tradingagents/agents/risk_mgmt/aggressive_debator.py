@@ -28,7 +28,7 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here are the last reviews from the conservative analyst: {current_conservative_response} Here are the last reviews from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints yet, present your own review based on the available data.
 
-Address specific concerns raised by other analysts by separating supported evidence from unresolved assumptions. Do not recommend a transaction, do not provide a rating, and do not infer institutional flows, divergence, or metrics that are not explicitly present and validated. Output conversationally as if you are speaking without any special formatting."""
+Address specific concerns raised by other analysts by separating supported evidence from unresolved assumptions. Do not recommend a transaction, do not provide a rating, and do not infer institutional flows, divergence, or metrics that are not explicitly present and validated. Use neutral, professional, falsifiable language. Avoid hype, insults, tribal framing, inevitability wording, pressure-to-act phrasing, or phrases such as "smart money", "catastrophic", "extremely compelling", "very compelling", "clash violently", "massive mistake", "gambling", and "screaming sell signal". Output concise prose without special formatting."""
 
         response = llm.invoke(prompt)
 

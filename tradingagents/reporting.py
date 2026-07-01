@@ -14,7 +14,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from tradingagents.validation import DashboardModel, ValidationResult, build_dashboard_model, validate_final_state
+from tradingagents.validation import (
+    DashboardModel,
+    ValidationResult,
+    build_dashboard_model,
+    build_decision_evidence_bundle,
+    rejected_claims,
+    usable_historical_lessons,
+    validate_final_state,
+    verified_claims,
+)
 
 
 def finalize_validation_artifacts(
@@ -26,12 +35,17 @@ def finalize_validation_artifacts(
     strict_validation: bool = False,
 ) -> tuple[ValidationResult, DashboardModel]:
     """Build and validate publication artifacts in final-gate order."""
+    _attach_claim_artifacts(final_state)
     if validation_result is None:
         validation_result = validate_final_state(
             final_state,
             expected_analysts=expected_analysts,
             strict_mode=strict_validation,
         )
+
+    _attach_claim_artifacts(final_state)
+    evidence_bundle = build_decision_evidence_bundle(final_state, validation_result)
+    final_state["decision_evidence_bundle"] = evidence_bundle.model_dump(mode="json")
 
     dashboard_model = dashboard_model or build_dashboard_model(final_state, validation_result)
     final_state["dashboard_model"] = dashboard_model.model_dump(mode="json")
@@ -42,6 +56,14 @@ def finalize_validation_artifacts(
     )
 
     rebuilt_dashboard = build_dashboard_model(final_state, validation_result)
+    _attach_claim_artifacts(final_state)
+    evidence_bundle = build_decision_evidence_bundle(final_state, validation_result)
+    final_state["decision_evidence_bundle"] = evidence_bundle.model_dump(mode="json")
+    validation_result = validate_final_state(
+        final_state,
+        expected_analysts=expected_analysts,
+        strict_mode=strict_validation,
+    )
     if rebuilt_dashboard != dashboard_model:
         dashboard_model = rebuilt_dashboard
         final_state["dashboard_model"] = dashboard_model.model_dump(mode="json")
@@ -77,6 +99,8 @@ def write_report_tree(
     )
     write_validation_report(save_path, validation_result)
     write_dashboard_report(save_path, dashboard_model)
+    write_decision_evidence_report(save_path, final_state)
+    write_claim_reports(save_path, final_state)
 
     if strict_validation and validation_result.has_blocking_issues:
         codes = ", ".join(issue.code for issue in validation_result.blocking_issues)
@@ -160,8 +184,13 @@ def write_report_tree(
         if risk.get("judge_decision"):
             portfolio_dir = save_path / "5_portfolio"
             portfolio_dir.mkdir(exist_ok=True)
-            (portfolio_dir / "decision.md").write_text(risk["judge_decision"], encoding="utf-8")
-            sections.append(f"## V. Portfolio Manager Decision\n\n### Portfolio Manager\n{risk['judge_decision']}")
+            portfolio_decision = _published_portfolio_decision(
+                raw_decision=risk["judge_decision"],
+                validation_result=validation_result,
+                dashboard_model=dashboard_model,
+            )
+            (portfolio_dir / "decision.md").write_text(portfolio_decision, encoding="utf-8")
+            sections.append(f"## V. Portfolio Manager Decision\n\n### Portfolio Manager\n{portfolio_decision}")
 
     # Write consolidated report
     header = f"# Trading Analysis Report: {ticker}\n\nGenerated: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -220,6 +249,73 @@ def write_dashboard_report(save_path: Path, dashboard_model: DashboardModel) -> 
     report_path.write_text(
         json.dumps(dashboard_model.model_dump(mode="json"), indent=2),
         encoding="utf-8",
+    )
+
+
+def write_decision_evidence_report(save_path: Path, final_state: dict) -> None:
+    bundle = final_state.get("decision_evidence_bundle") or {}
+    bundle_path = save_path / "decision_evidence_bundle.json"
+    bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+
+    lessons = [
+        lesson.model_dump(mode="json")
+        for lesson in usable_historical_lessons(final_state)
+    ]
+    lessons_path = save_path / "validated_lessons.json"
+    lessons_path.write_text(json.dumps(lessons, indent=2), encoding="utf-8")
+
+
+def write_claim_reports(save_path: Path, final_state: dict) -> None:
+    verified_path = save_path / "verified_claims.json"
+    verified_path.write_text(
+        json.dumps(final_state.get("verified_claims") or [], indent=2),
+        encoding="utf-8",
+    )
+
+    rejected_path = save_path / "rejected_claims.json"
+    rejected_path.write_text(
+        json.dumps(final_state.get("rejected_claims") or [], indent=2),
+        encoding="utf-8",
+    )
+
+
+def _attach_claim_artifacts(final_state: dict) -> None:
+    final_state["verified_claims"] = [
+        claim.model_dump(mode="json") for claim in verified_claims(final_state)
+    ]
+    final_state["rejected_claims"] = [
+        claim.model_dump(mode="json") for claim in rejected_claims(final_state)
+    ]
+
+
+def _published_portfolio_decision(
+    *,
+    raw_decision: str,
+    validation_result: ValidationResult,
+    dashboard_model: DashboardModel,
+) -> str:
+    if dashboard_model.decision_status == "available":
+        return raw_decision
+
+    reasons = [
+        issue.message.rstrip(".")
+        for issue in validation_result.blocking_issues[:5]
+    ]
+    if not reasons:
+        reasons = [
+            "The report status is research-only, so the final model output has not met the publication threshold for transaction authority",
+            "The decision evidence bundle does not contain verified directional evidence sufficient for an actionable portfolio rating",
+        ]
+
+    reason_lines = "\n".join(f"- {reason}." for reason in reasons)
+    return (
+        "**Rating**: Insufficient Evidence\n\n"
+        "**Action**: No current transaction\n\n"
+        "**Executive Summary**: The validation dashboard blocks transaction "
+        "authority for this report. Any raw directional Portfolio Manager "
+        "output from the model is treated as non-published research context, "
+        "not as an actionable recommendation.\n\n"
+        f"**Reason**:\n{reason_lines}"
     )
 
 

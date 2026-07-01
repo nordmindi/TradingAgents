@@ -21,6 +21,7 @@ COPY --chown=app:app pyproject.toml README.md ./
 COPY --chown=app:app tradingagents/ tradingagents/
 COPY --chown=app:app cli/ cli/
 COPY --chown=app:app scripts/ scripts/
+COPY --chown=app:app assets/ assets/
 
 # Install build dependencies first (setuptools required by pyproject.toml build-system)
 RUN pip install --no-cache-dir "setuptools>=61.0" wheel

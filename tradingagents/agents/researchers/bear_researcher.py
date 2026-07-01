@@ -30,7 +30,7 @@ Latest world affairs news: {news_report}
 Company fundamentals report: {fundamentals_report}
 Conversation history of the debate: {history}
 Last bull argument: {current_response}
-Use this information to produce a neutral downside evidence review. Do not recommend a transaction, do not provide a rating, and do not fill evidence gaps with assumptions.
+Use this information to produce a neutral downside evidence review. Do not recommend a transaction, do not provide a rating, and do not fill evidence gaps with assumptions. Use neutral, professional, falsifiable language. Avoid hype, insults, tribal framing, inevitability wording, pressure-to-act phrasing, or phrases such as "smart money", "catastrophic", "extremely compelling", "very compelling", "clash violently", "massive mistake", "gambling", and "screaming sell signal".
 """
 
         response = llm.invoke(prompt)

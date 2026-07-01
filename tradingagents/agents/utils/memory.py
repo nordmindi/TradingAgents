@@ -95,6 +95,16 @@ class TradingMemoryLog:
             parts.extend(self._format_reflection_only(e) for e in cross)
         return "\n\n".join(parts)
 
+    def get_validated_lessons(self, ticker: str) -> List[dict]:
+        """Return validated lesson records usable by the Portfolio Manager.
+
+        The legacy markdown memory log does not preserve run IDs, prices,
+        benchmark values, costs, slippage, duplicate groups, or leakage checks.
+        Those entries remain available for audit via ``get_past_context`` but
+        are not decision-usable evidence.
+        """
+        return []
+
     # --- Update path (Phase B) ---
 
     def update_with_outcome(

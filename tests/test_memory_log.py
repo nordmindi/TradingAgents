@@ -58,11 +58,44 @@ def _price_df(prices):
     return pd.DataFrame({"Close": prices})
 
 
-def _make_pm_state(past_context=""):
+def _valid_lesson(**overrides):
+    lesson = {
+        "lesson_id": "LESSON-NVDA-20260105",
+        "ticker": "NVDA",
+        "original_run_id": "run-nvda-20260105",
+        "original_decision_timestamp": "2026-01-05T14:30:00",
+        "recommendation": "Buy",
+        "entry_timestamp": "2026-01-05T14:30:00",
+        "entry_price": "100.00",
+        "exit_timestamp": "2026-01-12T20:00:00",
+        "exit_price": "105.00",
+        "benchmark_symbol": "SPY",
+        "benchmark_entry": "500.00",
+        "benchmark_exit": "510.00",
+        "gross_return": "0.0500",
+        "net_return": "0.0480",
+        "benchmark_return": "0.0200",
+        "alpha": "0.0280",
+        "holding_period_sessions": 5,
+        "transaction_cost_assumption_bps": "5",
+        "slippage_assumption_bps": "5",
+        "pattern_features": {"setup": "momentum"},
+        "outcome_known_after_decision": True,
+        "out_of_sample": True,
+        "duplicate_group_id": None,
+        "source_ids": ["memory:run-nvda-20260105"],
+        "validation_status": "validated",
+    }
+    lesson.update(overrides)
+    return lesson
+
+
+def _make_pm_state(past_context="", historical_lessons_evidence=None):
     """Minimal AgentState dict for portfolio_manager_node."""
     return {
         "company_of_interest": "NVDA",
         "past_context": past_context,
+        "historical_lessons_evidence": historical_lessons_evidence or [],
         "risk_debate_state": {
             "history": "Risk debate history.",
             "aggressive_history": "",
@@ -589,14 +622,23 @@ class TestPortfolioManagerInjection:
 
     # PM prompt
 
-    def test_pm_prompt_includes_past_context(self):
+    def test_pm_prompt_omits_unvalidated_past_context(self):
         captured = {}
         llm = _structured_pm_llm(captured)
         pm_node = create_portfolio_manager(llm)
         state = _make_pm_state(past_context="[2026-01-05 | NVDA | Buy | +5.0% | +2.0% | 5d]\nGreat call.")
         pm_node(state)
-        assert "Lessons from prior decisions and outcomes" in captured["prompt"]
-        assert "Great call." in captured["prompt"]
+        assert "Lessons from prior decisions and outcomes" not in captured["prompt"]
+        assert "Great call." not in captured["prompt"]
+
+    def test_pm_prompt_includes_validated_lessons(self):
+        captured = {}
+        llm = _structured_pm_llm(captured)
+        pm_node = create_portfolio_manager(llm)
+        state = _make_pm_state(historical_lessons_evidence=[_valid_lesson()])
+        pm_node(state)
+        assert "Validated historical lessons available" in captured["prompt"]
+        assert "LESSON-NVDA-20260105" in captured["prompt"]
 
     def test_pm_no_past_context_no_section(self):
         """PM prompt omits the lessons section entirely when past_context is empty."""
@@ -685,7 +727,7 @@ class TestPortfolioManagerInjection:
     # Full A→B→C integration cycle
 
     def test_full_cycle_store_resolve_inject(self, tmp_path):
-        """store pending → resolve with outcome → past_context non-empty for PM."""
+        """store pending -> resolve with outcome -> legacy context is audit-only."""
         log = make_log(tmp_path)
         log.store_decision("NVDA", "2026-01-05", DECISION_BUY)
         assert len(log.get_pending_entries()) == 1
@@ -698,6 +740,7 @@ class TestPortfolioManagerInjection:
         assert "Correct call." in past_ctx
         assert "DECISION:" in past_ctx
         assert "REFLECTION:" in past_ctx
+        assert log.get_validated_lessons("NVDA") == []
 
 
 # ---------------------------------------------------------------------------

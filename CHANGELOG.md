@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [Unreleased]
+
+### Fixed
+
+- **Asset handling in production builds** — Fixed issue where logos were not appearing in PDF reports in production builds. Assets are now properly included in package distributions and the PDF generation script can locate assets in both development and production environments.
+
 ## [0.2.4] — 2026-04-25
 
 ### Added

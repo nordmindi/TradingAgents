@@ -1,14 +1,79 @@
 import os
 import re
+import sys
 from datetime import datetime
+from pathlib import Path
 
 from fpdf import FPDF
+from fpdf.enums import MethodReturnValue
+
+
+DISPLAY_REPLACEMENTS = {
+    "INSUFFICIENT_EVIDENCE": "Insufficient Evidence",
+    "NO_CURRENT_TRANSACTION": "No current transaction",
+    "RESEARCH_OUTPUT": "Research Output",
+    "research_only": "Research Only",
+    "verified_with_warnings": "Verified with Warnings",
+    "close_10_ema": "10-day EMA",
+    "close_50_sma": "50-day SMA",
+    "close_200_sma": "200-day SMA",
+    "macdh": "MACD histogram",
+    "macds": "MACD signal line",
+    "macd": "MACD",
+    "boll_ub": "Bollinger upper band",
+    "boll_lb": "Bollinger lower band",
+    "boll": "Bollinger middle band",
+    "vwma": "VWMA",
+    "rsi": "RSI",
+    "atr": "ATR",
+    "ema": "EMA",
+    "sma": "SMA",
+    "ohlcv": "OHLCV",
+    "get_stock_data": "stock price data lookup",
+    "get_indicators": "technical indicator lookup",
+    "get_fundamentals": "fundamentals lookup",
+    "get_balance_sheet": "balance sheet lookup",
+    "get_cashflow": "cash flow lookup",
+    "get_income_statement": "income statement lookup",
+    "get_news": "news data lookup",
+    "get_global_news": "global news lookup",
+    "get_insider_transactions": "insider transaction lookup",
+    "dynamic S/R": "dynamic support/resistance",
+}
+
+
+def display_text(text):
+    if not text:
+        return ""
+    text = str(text)
+    text = text.replace("`", "")
+    text = text.replace("//", ":")
+    for source, replacement in DISPLAY_REPLACEMENTS.items():
+        text = re.sub(rf"(?<![A-Za-z0-9_]){re.escape(source)}(?![A-Za-z0-9_])", replacement, text)
+    text = re.sub(r"\b([a-z]+(?:_[a-z0-9]+)+)\b", _humanize_identifier_match, text)
+    text = re.sub(r"\b([A-Z]+(?:_[A-Z0-9]+)+)\b", _humanize_constant_match, text)
+    text = re.sub(r"\s+:\s+", ": ", text)
+    return text
+
+
+def _humanize_identifier_match(match):
+    value = match.group(1)
+    if value in DISPLAY_REPLACEMENTS:
+        return DISPLAY_REPLACEMENTS[value]
+    return value.replace("_", " ")
+
+
+def _humanize_constant_match(match):
+    value = match.group(1)
+    if value in DISPLAY_REPLACEMENTS:
+        return DISPLAY_REPLACEMENTS[value]
+    return value.replace("_", " ").title()
 
 
 class VeinReportPDF(FPDF):
     def __init__(self, orientation="P", unit="mm", format="A4", status_label="RESEARCH_OUTPUT"):
         super().__init__(orientation, unit, format)
-        self.status_label = status_label
+        self.status_label = display_text(status_label)
         self.colors = {
             "white": (255, 255, 255),
             "ink": (17, 24, 39),
@@ -27,7 +92,29 @@ class VeinReportPDF(FPDF):
         self.r_margin_val = 17
         self.set_margins(self.l_margin_val, 22, self.r_margin_val)
         self.content_width = 210 - self.l_margin_val - self.r_margin_val
-        self.logo_path = os.path.join(os.getcwd(), "assets", "vein-logo-text.webp")
+        # Try to find the assets folder in different possible locations
+        # 1. In the current working directory (development)
+        # 2. In the package installation directory (production)
+        possible_paths = [
+            os.path.join(os.getcwd(), "assets", "vein-logo-text.webp"),
+            os.path.join(os.path.dirname(__file__), "..", "assets", "vein-logo-text.webp"),
+            os.path.join(sys.prefix, "assets", "vein-logo-text.webp"),
+            os.path.join(getattr(sys, '_MEIPASS', ''), "assets", "vein-logo-text.webp"),
+        ]
+        
+        self.logo_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                self.logo_path = path
+                break
+        
+        # If still not found, try to find it relative to the package
+        if self.logo_path is None:
+            # Try to find the package root
+            package_root = Path(__file__).parent.parent
+            asset_path = package_root / "assets" / "vein-logo-text.webp"
+            if asset_path.exists():
+                self.logo_path = str(asset_path)
 
     def header(self):
         if self.page_no() == 1:
@@ -38,7 +125,7 @@ class VeinReportPDF(FPDF):
         self.set_fill_color(*self.colors["teal"])
         self.rect(0, 25, self.w, 1.2, "F")
 
-        if os.path.exists(self.logo_path):
+        if self.logo_path and os.path.exists(self.logo_path):
             self.image(self.logo_path, x=17, y=8, w=29)
 
         self.set_xy(52, 8)
@@ -47,7 +134,7 @@ class VeinReportPDF(FPDF):
         self.cell(0, 5, "TRADING INTELLIGENCE REPORT", ln=True)
         self.set_x(52)
         self.set_font("helvetica", "", 7.5)
-        self.cell(0, 4, f"VALIDATION STATUS // {self.status_label}", ln=False)
+        self.cell(0, 4, f"VALIDATION STATUS: {self.status_label}", ln=False)
 
         self.set_xy(self.w - 43, 9)
         self.set_font("helvetica", "B", 8)
@@ -73,7 +160,7 @@ class VeinReportPDF(FPDF):
         self.set_fill_color(*self.colors["teal"])
         self.rect(0, 28, self.w, 2, "F")
 
-        if os.path.exists(self.logo_path):
+        if self.logo_path and os.path.exists(self.logo_path):
             self.image(self.logo_path, x=(self.w / 2) - 37, y=52, w=74)
 
         self.set_y(105)
@@ -107,6 +194,7 @@ class MarkdownPDFGenerator:
             return ""
         text = "".join(c for c in str(text) if ord(c) < 256)
         text = text.replace("**", "")
+        text = display_text(text)
         return re.sub(r"\s{3,}", " ", text).strip()
 
     def add_highlights_page(self, md_text, dashboard_metrics=None):
@@ -199,7 +287,7 @@ class MarkdownPDFGenerator:
             if "|" in raw_line and "---" in raw_line:
                 continue
             if "|" in raw_line:
-                table_rows.append([self._clean_line(p) for p in raw_line.split("|") if p.strip()])
+                table_rows.append(self._parse_table_row(raw_line))
                 continue
             if table_rows:
                 self._render_table(table_rows)
@@ -266,22 +354,150 @@ class MarkdownPDFGenerator:
     def _render_table(self, rows):
         if not rows:
             return
+        rows = self._normalize_table_rows(rows)
+        if not rows:
+            return
+
         self.pdf.ln(2)
-        self.pdf.set_x(self.pdf.l_margin_val)
-        with self.pdf.table(
-            width=self.pdf.content_width,
-            line_height=7,
-            cell_fill_color=self.colors["surface"],
-            cell_fill_mode="ROWS",
-            borders_layout="SINGLE_TOP_LINE",
-        ) as table:
-            for i, row in enumerate(rows):
-                r = table.row()
-                self.pdf.set_font("helvetica", "B" if i == 0 else "", 8.2)
-                self.pdf.set_text_color(*(self.colors["navy"] if i == 0 else self.colors["ink"]))
-                for cell in row:
-                    r.cell(self._clean_line(cell))
+        widths = self._table_column_widths(rows)
+        self._draw_table_header(rows[0], widths)
+        for i, row in enumerate(rows[1:], start=1):
+            self._draw_table_row(row, widths, is_header=False, fill=i % 2 == 1)
         self.pdf.ln(4)
+
+    def _parse_table_row(self, raw_line):
+        parts = raw_line.split("|")
+        if raw_line.startswith("|"):
+            parts = parts[1:]
+        if raw_line.endswith("|"):
+            parts = parts[:-1]
+        return [self._clean_line(part) for part in parts]
+
+    def _normalize_table_rows(self, rows):
+        cleaned = [[self._clean_line(cell) for cell in row] for row in rows]
+        cleaned = [row for row in cleaned if any(cell for cell in row)]
+        if not cleaned:
+            return []
+        col_count = max(len(row) for row in cleaned)
+        return [row + [""] * (col_count - len(row)) for row in cleaned]
+
+    def _table_column_widths(self, rows):
+        col_count = len(rows[0])
+        total_width = self.pdf.content_width
+        padding = 4
+
+        body_rows = rows[1:] or rows
+        min_widths = []
+        desired_widths = []
+        for col_idx in range(col_count):
+            header = rows[0][col_idx]
+            cells = [row[col_idx] for row in body_rows]
+            all_cells = [header] + cells
+
+            self.pdf.set_font("helvetica", "B", 8.0)
+            header_width = self.pdf.get_string_width(header) + padding
+            self.pdf.set_font("helvetica", "", 8.0)
+            word_width = max(
+                [self.pdf.get_string_width(word) for cell in all_cells for word in cell.split()]
+                or [0]
+            ) + padding
+            full_width = max([self.pdf.get_string_width(cell) for cell in all_cells] or [0]) + padding
+            avg_chars = sum(len(cell) for cell in cells) / max(1, len(cells))
+
+            min_width = max(10, min(max(header_width, word_width), 44))
+            desired_cap = max(22, min(total_width * 0.58, 34 + avg_chars * 0.75))
+            desired = max(min_width, min(full_width, desired_cap))
+            min_widths.append(min_width)
+            desired_widths.append(desired)
+
+        min_total = sum(min_widths)
+        if min_total >= total_width:
+            scale = total_width / min_total
+            return [width * scale for width in min_widths]
+
+        desired_total = sum(desired_widths)
+        if desired_total <= total_width:
+            extra = total_width - desired_total
+            priorities = [
+                max(1.0, sum(len(row[col_idx]) for row in rows) / max(1, len(rows)))
+                for col_idx in range(col_count)
+            ]
+            priority_total = sum(priorities)
+            return [
+                desired_widths[i] + extra * (priorities[i] / priority_total)
+                for i in range(col_count)
+            ]
+
+        shrinkable = [desired_widths[i] - min_widths[i] for i in range(col_count)]
+        shrink_total = sum(shrinkable)
+        overflow = desired_total - total_width
+        if shrink_total <= 0:
+            return min_widths
+        return [
+            desired_widths[i] - overflow * (shrinkable[i] / shrink_total)
+            for i in range(col_count)
+        ]
+
+    def _draw_table_header(self, row, widths):
+        self._draw_table_row(row, widths, is_header=True, fill=True)
+
+    def _draw_table_row(self, row, widths, *, is_header, fill):
+        font_style = "B" if is_header else ""
+        font_size = 8.0 if is_header else 7.8
+        line_height = 4.5 if is_header else 4.8
+        x0 = self.pdf.l_margin_val
+        y0 = self.pdf.get_y()
+        row_height = self._table_row_height(row, widths, font_style, font_size, line_height)
+
+        if y0 + row_height > self.pdf.page_break_trigger:
+            self.pdf.add_page()
+            y0 = self.pdf.get_y()
+
+        fill_color = self.colors["surface_alt"] if is_header else self.colors["surface"]
+        self.pdf.set_fill_color(*fill_color)
+        self.pdf.set_draw_color(*(self.colors["teal"] if is_header else self.colors["border"]))
+        self.pdf.set_line_width(0.35 if is_header else 0.2)
+
+        x = x0
+        for width in widths:
+            if fill:
+                self.pdf.rect(x, y0, width, row_height, "F")
+            x += width
+
+        self.pdf.line(x0, y0, x0 + sum(widths), y0)
+        self.pdf.line(x0, y0 + row_height, x0 + sum(widths), y0 + row_height)
+
+        x = x0
+        self.pdf.set_font("helvetica", font_style, font_size)
+        self.pdf.set_text_color(*(self.colors["navy"] if is_header else self.colors["ink"]))
+        for cell, width in zip(row, widths):
+            self.pdf.set_xy(x + 2, y0 + 2)
+            self.pdf.multi_cell(
+                max(1, width - 4),
+                line_height,
+                self._clean_line(cell),
+                border=0,
+                align="L",
+                new_x="RIGHT",
+                new_y="TOP",
+            )
+            x += width
+
+        self.pdf.set_y(y0 + row_height)
+
+    def _table_row_height(self, row, widths, font_style, font_size, line_height):
+        self.pdf.set_font("helvetica", font_style, font_size)
+        max_lines = 1
+        for cell, width in zip(row, widths):
+            lines = self.pdf.multi_cell(
+                max(1, width - 4),
+                line_height,
+                self._clean_line(cell),
+                dry_run=True,
+                output=MethodReturnValue.LINES,
+            )
+            max_lines = max(max_lines, len(lines) if lines else 1)
+        return max_lines * line_height + 4
 
     def save(self, output_path):
         self.pdf.output(output_path)

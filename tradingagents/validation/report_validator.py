@@ -8,6 +8,8 @@ from tradingagents.agents.utils.rating import parse_rating
 
 from .models import ValidationIssue, ValidationResult
 from .dashboard import validate_dashboard_consistency
+from .claims import rejected_claims
+from .evidence import usable_historical_lessons
 from .technical import validate_technical_claims
 
 
@@ -54,12 +56,6 @@ UNVERIFIED_FUNDAMENTALS_RE = re.compile(
     r"unable to retrieve fundamentals|failed to retrieve fundamentals|insufficient fundamentals)\b",
 )
 
-AUDITABLE_LESSON_KEYS = {
-    "historical_lessons_evidence",
-    "memory_evidence",
-    "auditable_lessons",
-}
-
 LESSON_REFERENCE_RE = re.compile(
     r"(?i)\b(prior decisions?|past decisions?|historical lessons?|prior lessons?|"
     r"memory|lessons? learned)\b",
@@ -68,6 +64,33 @@ LESSON_REFERENCE_RE = re.compile(
 TECHNICAL_METRICS_REQUIRING_ACTIVE_REPORT = {
     "VWMA": re.compile(r"(?i)\bVWMA\b|volume[-\s]?weighted moving average"),
 }
+
+STREAK_CLAIM_RE = re.compile(
+    r"(?i)\b(consecutive|every session|straight sessions?|continuously expanding|"
+    r"expanded for \d+|expanding for \d+|streak)\b",
+)
+
+DECISION_OVERRIDE_EVIDENCE_KEYS = {
+    "decision_override",
+    "decision_override_evidence",
+    "verified_override_evidence",
+}
+
+LOWER_LEVEL_NEUTRAL_RE = re.compile(
+    r"(?i)\b(evidence balance\*\*:\s*(balanced|insufficient evidence)|"
+    r"execution bias\*\*:\s*(neutral|insufficient evidence)|"
+    r"decision permitted\*\*:\s*no|neutral execution|insufficient evidence)\b",
+)
+
+RHETORICAL_LANGUAGE_RE = re.compile(
+    r"(?i)\b("
+    r"reading the tea leaves|bull'?s mirage|brick wall|screaming sell signal|"
+    r"smart money|deer in the headlights|massive mistake|suicidal stop|"
+    r"gambling|bulls are in control|clash(?:es|ed|ing)? violently|"
+    r"extremely compelling|very compelling|catastrophic|can't miss|"
+    r"no[-\s]?brainer|inevitable|guaranteed|slam dunk"
+    r")\b",
+)
 
 
 def validate_final_state(
@@ -98,6 +121,11 @@ def validate_final_state(
     issues.extend(_validate_price_target_methodology(final_state))
     issues.extend(_validate_metrics_exist_in_active_report(final_state))
     issues.extend(_validate_historical_lessons_are_auditable(final_state))
+    issues.extend(_validate_streak_claims(final_state))
+    issues.extend(_validate_decision_override(final_state))
+    issues.extend(_validate_rejected_claims(final_state))
+    issues.extend(_validate_neutral_language(final_state))
+    issues = _dedupe_issues(issues)
 
     if any(issue.severity == "blocking" for issue in issues):
         status = "blocked"
@@ -279,7 +307,7 @@ def _validate_directional_decision_evidence(final_state: dict) -> list[Validatio
     if not fundamentals or UNVERIFIED_FUNDAMENTALS_RE.search(fundamentals):
         return [
             ValidationIssue(
-                code="FUNDAMENTALS_MISSING_FOR_DIRECTIONAL_RATING",
+                code="FUNDAMENTAL_EVIDENCE_MISSING",
                 severity="blocking",
                 location="fundamentals_report",
                 message=(
@@ -319,7 +347,7 @@ def _validate_metrics_exist_in_active_report(final_state: dict) -> list[Validati
             if pattern.search(text):
                 issues.append(
                     ValidationIssue(
-                        code="METRIC_ABSENT_FROM_ACTIVE_REPORT",
+                        code="UNSUPPORTED_DECISION_INPUT",
                         severity="blocking",
                         location=key,
                         message=f"{metric} was referenced outside the active market report.",
@@ -334,18 +362,135 @@ def _validate_historical_lessons_are_auditable(final_state: dict) -> list[Valida
     if not LESSON_REFERENCE_RE.search(final_decision):
         return []
 
-    has_structured_evidence = any(final_state.get(key) for key in AUDITABLE_LESSON_KEYS)
-    if has_structured_evidence:
+    if usable_historical_lessons(final_state):
         return []
 
     return [
         ValidationIssue(
-            code="HISTORICAL_LESSON_EVIDENCE_MISSING",
+            code="UNVERIFIED_LESSON_HISTORY",
             severity="blocking",
             location="final_trade_decision",
             message="Historical lessons require structured, auditable evidence before use.",
         )
     ]
+
+
+def _validate_streak_claims(final_state: dict) -> list[ValidationIssue]:
+    metadata = _as_dict(final_state.get("technical_validation")) or {}
+    has_calculation_evidence = any(
+        metadata.get(key)
+        for key in (
+            "streak_calculations",
+            "calculation_ids",
+            "macd_histogram_streak",
+            "sequence_calculations",
+        )
+    )
+    if has_calculation_evidence:
+        return []
+
+    for key, text in _iter_text_fields(final_state):
+        if STREAK_CLAIM_RE.search(text):
+            return [
+                ValidationIssue(
+                    code="UNSUPPORTED_STREAK_CLAIM",
+                    severity="blocking",
+                    location=key,
+                    message="Sequence or streak claims require complete calculation evidence.",
+                )
+            ]
+    return []
+
+
+def _validate_decision_override(final_state: dict) -> list[ValidationIssue]:
+    final_decision = str(final_state.get("final_trade_decision", ""))
+    rating = parse_rating(final_decision, default="NOT_AVAILABLE")
+    if rating not in DIRECTIONAL_RATINGS:
+        return []
+
+    lower_level_text = "\n".join(
+        str(final_state.get(key, ""))
+        for key in ("investment_plan", "trader_investment_plan")
+    )
+    if not LOWER_LEVEL_NEUTRAL_RE.search(lower_level_text):
+        return []
+
+    has_override_evidence = any(final_state.get(key) for key in DECISION_OVERRIDE_EVIDENCE_KEYS)
+    if has_override_evidence:
+        return []
+
+    return [
+        ValidationIssue(
+            code="UNSUPPORTED_DECISION_OVERRIDE",
+            severity="blocking",
+            location="final_trade_decision",
+            message="Directional override of neutral or insufficient lower-level evidence requires new verified evidence.",
+        )
+    ]
+
+
+def _validate_rejected_claims(final_state: dict) -> list[ValidationIssue]:
+    code_by_type = {
+        "bullish_divergence": "FALSE_BULLISH_DIVERGENCE_CLAIM",
+        "bearish_divergence": "FALSE_BEARISH_DIVERGENCE_CLAIM",
+        "moving_average_cross": "MOVING_AVERAGE_CROSS_UNPROVEN",
+        "bollinger_squeeze": "BOLLINGER_SQUEEZE_UNPROVEN",
+        "technical_metric_reference": "UNSUPPORTED_DECISION_INPUT",
+        "volume_flow_inference": "UNSUPPORTED_VOLUME_INFERENCE",
+        "sequence_streak": "UNSUPPORTED_STREAK_CLAIM",
+    }
+    existing = set()
+    issues = []
+    for claim in rejected_claims(final_state):
+        code = code_by_type.get(claim.claim_type, "UNSUPPORTED_DECISION_INPUT")
+        key = (code, claim.location)
+        if key in existing:
+            continue
+        existing.add(key)
+        issues.append(
+            ValidationIssue(
+                code=code,
+                severity="blocking",
+                location=claim.location,
+                message=(
+                    f"Rejected downstream claim {claim.claim_id}: "
+                    f"{claim.statement}"
+                ),
+            )
+        )
+    return issues
+
+
+def _validate_neutral_language(final_state: dict) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    for key, text in _iter_text_fields(final_state):
+        match = RHETORICAL_LANGUAGE_RE.search(text)
+        if not match:
+            continue
+        issues.append(
+            ValidationIssue(
+                code="RHETORICAL_LANGUAGE",
+                severity="blocking",
+                location=key,
+                message=(
+                    "Report output contains prohibited rhetorical or "
+                    f"non-neutral language: '{match.group(0)}'."
+                ),
+            )
+        )
+    return issues
+
+
+def _dedupe_issues(issues: list[ValidationIssue]) -> list[ValidationIssue]:
+    deduped: list[ValidationIssue] = []
+    seen = set()
+    for issue in issues:
+        key = (issue.code, issue.location)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(issue)
+    return deduped
 
 
 def _validate_output_integrity(final_state: dict) -> list[ValidationIssue]:
@@ -389,7 +534,16 @@ def _validate_output_integrity(final_state: dict) -> list[ValidationIssue]:
 
 def _validation_metadata(final_state: dict) -> dict:
     metadata = {}
-    for key in ("instrument_resolution", "market_data_freshness", "technical_validation", "dashboard_model"):
+    for key in (
+        "instrument_resolution",
+        "market_data_freshness",
+        "technical_validation",
+        "dashboard_model",
+        "decision_evidence_bundle",
+        "historical_lessons_evidence",
+        "verified_claims",
+        "rejected_claims",
+    ):
         value = final_state.get(key)
         if value is not None:
             metadata[key] = _as_dict(value)
@@ -401,7 +555,7 @@ def _as_dict(value):
         return None
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
-    if isinstance(value, dict):
+    if isinstance(value, (dict, list)):
         return value
     return None
 

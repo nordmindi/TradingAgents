@@ -17,15 +17,22 @@ from tradingagents.agents.schemas import (
 )
 from tradingagents.reporting import write_report_tree
 from tradingagents.validation import (
+    bearish_divergence,
     bollinger_squeeze_valid,
     build_dashboard_model,
+    build_decision_evidence_bundle,
     bullish_divergence,
     check_market_data_freshness,
     detect_cross,
+    extract_downstream_claims,
+    lesson_is_usable,
     macd_components_reconcile,
+    rejected_claims,
     resolve_instrument,
+    usable_historical_lessons,
     validate_final_state,
     ValidationResult,
+    verified_claims,
 )
 
 
@@ -78,6 +85,38 @@ def _state(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def _valid_lesson(**overrides):
+    lesson = {
+        "lesson_id": "LESSON-NVDA-20260501",
+        "ticker": "NVDA",
+        "original_run_id": "run-nvda-20260501",
+        "original_decision_timestamp": "2026-05-01T14:30:00",
+        "recommendation": "Hold",
+        "entry_timestamp": "2026-05-01T14:30:00",
+        "entry_price": "100.00",
+        "exit_timestamp": "2026-05-08T20:00:00",
+        "exit_price": "103.00",
+        "benchmark_symbol": "SPY",
+        "benchmark_entry": "500.00",
+        "benchmark_exit": "505.00",
+        "gross_return": "0.0300",
+        "net_return": "0.0280",
+        "benchmark_return": "0.0100",
+        "alpha": "0.0180",
+        "holding_period_sessions": 5,
+        "transaction_cost_assumption_bps": "5",
+        "slippage_assumption_bps": "5",
+        "pattern_features": {"setup": "balanced"},
+        "outcome_known_after_decision": True,
+        "out_of_sample": True,
+        "duplicate_group_id": None,
+        "source_ids": ["memory:run-nvda-20260501"],
+        "validation_status": "validated",
+    }
+    lesson.update(overrides)
+    return lesson
 
 
 @pytest.mark.unit
@@ -221,7 +260,7 @@ class TestReportValidation:
             )
         )
         assert result.status == "blocked"
-        assert any(issue.code == "DASHBOARD_UNSAFE_RECOMMENDATION" for issue in result.blocking_issues)
+        assert any(issue.code == "RESEARCH_ONLY_ACTION_CONFLICT" for issue in result.blocking_issues)
 
     def test_corrupted_output_blocks(self):
         result = validate_final_state(_state(news_report="Valid words " + "\x00" * 20))
@@ -290,7 +329,7 @@ class TestReportValidation:
         )
         assert result.status == "blocked"
         assert any(
-            issue.code == "FUNDAMENTALS_MISSING_FOR_DIRECTIONAL_RATING"
+            issue.code == "FUNDAMENTAL_EVIDENCE_MISSING"
             for issue in result.blocking_issues
         )
 
@@ -340,7 +379,7 @@ class TestReportValidation:
         )
         assert result.status == "blocked"
         assert any(
-            issue.code == "METRIC_ABSENT_FROM_ACTIVE_REPORT"
+            issue.code == "UNSUPPORTED_DECISION_INPUT"
             for issue in result.blocking_issues
         )
 
@@ -355,7 +394,7 @@ class TestReportValidation:
         )
         assert result.status == "blocked"
         assert any(
-            issue.code == "HISTORICAL_LESSON_EVIDENCE_MISSING"
+            issue.code == "UNVERIFIED_LESSON_HISTORY"
             for issue in result.blocking_issues
         )
 
@@ -366,20 +405,244 @@ class TestReportValidation:
                     "**Rating**: Hold\n\n"
                     "**Executive Summary**: Prior lessons support caution."
                 ),
-                historical_lessons_evidence=[
-                    {
-                        "date": "2026-05-01",
-                        "ticker": "NVDA",
-                        "decision": "Hold",
-                        "outcome": "No transaction",
-                    }
-                ],
+                historical_lessons_evidence=[_valid_lesson()],
             )
         )
         assert not any(
-            issue.code == "HISTORICAL_LESSON_EVIDENCE_MISSING"
+            issue.code == "UNVERIFIED_LESSON_HISTORY"
             for issue in result.issues
         )
+
+    def test_invalid_historical_lesson_is_not_usable(self):
+        assert not lesson_is_usable(
+            _valid_lesson(validation_status="possible_leakage")
+        )
+
+    def test_duplicate_historical_lessons_are_excluded(self):
+        lessons = usable_historical_lessons(
+            _state(
+                historical_lessons_evidence=[
+                    _valid_lesson(lesson_id="L1", duplicate_group_id="dup-1"),
+                    _valid_lesson(lesson_id="L2", duplicate_group_id="dup-1"),
+                    _valid_lesson(lesson_id="L3", duplicate_group_id=None),
+                ]
+            )
+        )
+        assert [lesson.lesson_id for lesson in lessons] == ["L3"]
+
+    def test_decision_evidence_bundle_records_usable_lessons_and_blockers(self):
+        state = _state(
+            historical_lessons_evidence=[_valid_lesson()],
+            technical_validation={
+                "rsi_divergence": {
+                    "validated": True,
+                    "event": "bullish_divergence",
+                }
+            },
+        )
+        validation = validate_final_state(state)
+        bundle = build_decision_evidence_bundle(state, validation)
+        assert "LESSON-NVDA-20260501" in bundle.validated_lesson_ids
+        assert "metric:rsi_divergence" in bundle.validated_metric_ids
+        assert bundle.unresolved_blocking_issues == []
+
+    def test_claim_extraction_rejects_unsupported_downstream_claims(self):
+        state = _state(
+            investment_debate_state={
+                "bull_history": "VWMA confirms the setup.",
+                "bear_history": "This is a classic bearish divergence.",
+                "judge_decision": "",
+            },
+            risk_debate_state={
+                "aggressive_history": "Volume shows accumulation behavior.",
+                "conservative_history": "",
+                "neutral_history": "",
+                "judge_decision": "",
+            },
+        )
+        claims = rejected_claims(state)
+        claim_types = {claim.claim_type for claim in claims}
+        assert {
+            "technical_metric_reference",
+            "bearish_divergence",
+            "volume_flow_inference",
+        }.issubset(claim_types)
+        assert all(not claim.publishable for claim in claims)
+
+    def test_claim_extraction_verifies_supported_divergence_claim(self):
+        state = _state(
+            market_report="RSI shows a bullish divergence after the new low.",
+            technical_validation={
+                "rsi_divergence": {
+                    "validated": True,
+                    "event": "bullish_divergence",
+                    "price_low_1": 30.71,
+                    "price_low_2": 29.93,
+                    "indicator_low_1": 35.26,
+                    "indicator_low_2": 38.10,
+                }
+            },
+        )
+        claims = verified_claims(state)
+        assert len(claims) == 1
+        assert claims[0].claim_type == "bullish_divergence"
+        assert claims[0].publishable is True
+
+    def test_evidence_bundle_uses_verified_claim_ids(self):
+        state = _state(
+            market_report="RSI shows a bullish divergence after the new low.",
+            technical_validation={
+                "rsi_divergence": {
+                    "validated": True,
+                    "event": "bullish_divergence",
+                }
+            },
+        )
+        bundle = build_decision_evidence_bundle(state, validate_final_state(state))
+        claim_ids = {claim.claim_id for claim in verified_claims(state)}
+        assert set(bundle.verified_claim_ids) == claim_ids
+
+    def test_unsupported_streak_claim_blocks(self):
+        result = validate_final_state(
+            _state(
+                final_trade_decision=(
+                    "**Rating**: Hold\n\n"
+                    "**Executive Summary**: MACD histogram expanded for seven consecutive sessions."
+                )
+            )
+        )
+        assert result.status == "blocked"
+        assert any(issue.code == "UNSUPPORTED_STREAK_CLAIM" for issue in result.blocking_issues)
+
+    def test_directional_override_requires_new_verified_evidence(self):
+        result = validate_final_state(
+            _state(
+                investment_plan="**Evidence Balance**: Balanced\n\n**Decision Permitted**: No",
+                trader_investment_plan="**Execution Bias**: Neutral",
+                final_trade_decision="**Rating**: Overweight\n\n**Executive Summary**: Override to add exposure.",
+            )
+        )
+        assert result.status == "blocked"
+        assert any(issue.code == "UNSUPPORTED_DECISION_OVERRIDE" for issue in result.blocking_issues)
+
+    def test_rhetorical_language_blocks(self):
+        result = validate_final_state(
+            _state(
+                risk_debate_state={
+                    "aggressive_history": "The evidence is extremely compelling and risks clash violently.",
+                    "conservative_history": "",
+                    "neutral_history": "",
+                    "judge_decision": "",
+                }
+            )
+        )
+        assert result.status == "blocked"
+        assert any(issue.code == "RHETORICAL_LANGUAGE" for issue in result.blocking_issues)
+
+    def test_duplicate_issue_codes_per_location_are_deduplicated(self):
+        result = validate_final_state(
+            _state(
+                market_report=(
+                    "The market has a death cross. "
+                    "This death cross confirms structural weakness."
+                )
+            )
+        )
+        matching = [
+            issue
+            for issue in result.blocking_issues
+            if issue.code == "MOVING_AVERAGE_CROSS_UNPROVEN"
+            and issue.location == "market_report"
+        ]
+        assert len(matching) == 1
+
+    def test_cross_context_reference_does_not_create_cross_claim(self):
+        state = _state(
+            market_report=(
+                "The 200 SMA is included as Golden/Death Cross context only; "
+                "no dated crossover event is asserted."
+            )
+        )
+        result = validate_final_state(state)
+
+        assert not any(
+            issue.code == "MOVING_AVERAGE_CROSS_UNPROVEN"
+            for issue in result.blocking_issues
+        )
+        assert not any(
+            claim.claim_type == "moving_average_cross"
+            for claim in rejected_claims(state)
+        )
+
+    def test_tsla_v3_bad_artifact_emits_expected_blockers(self):
+        result = validate_final_state(
+            _state(
+                company_of_interest="TSLA",
+                market_report="Market report covers RSI, MACD, ATR, and SMA only.",
+                fundamentals_report="No verified fundamentals were provided.",
+                investment_plan="**Evidence Balance**: Balanced\n\n**Decision Permitted**: No",
+                trader_investment_plan="**Execution Bias**: Neutral",
+                final_trade_decision=(
+                    "**Rating**: Overweight\n\n"
+                    "**Executive Summary**: Prior lessons and VWMA support adding exposure. "
+                    "MACD histogram expanded for seven consecutive sessions.\n\n"
+                    "**Investment Thesis**: This overrides neutral lower-level evidence.\n\n"
+                    "**Price Target**: 425"
+                ),
+                market_data_freshness={
+                    "ticker": "TSLA",
+                    "requested_as_of": "2026-06-29",
+                    "provider": "yfinance",
+                    "market_data_session": "2026-05-07",
+                    "sessions_stale": 35,
+                    "freshness_status": "blocked",
+                    "max_completed_sessions_old": 2,
+                    "recommendation_allowed": False,
+                    "analyzed_price": 398.73,
+                    "current_price": 425.00,
+                    "warnings": ["Market data are 35 completed sessions old."],
+                },
+                investment_debate_state={
+                    "bull_history": "",
+                    "bear_history": "This is a classic bearish divergence.",
+                    "judge_decision": "",
+                },
+                risk_debate_state={
+                    "aggressive_history": "Volume shows accumulation behavior.",
+                    "conservative_history": "",
+                    "neutral_history": "",
+                    "judge_decision": "",
+                },
+                dashboard_model={
+                    "report_status": "research_only",
+                    "decision_status": "available",
+                    "recommendation": "Overweight",
+                    "action": "Use final Portfolio Manager rating: Overweight",
+                    "target_low": None,
+                    "target_base": 425,
+                    "target_high": None,
+                    "sentiment": None,
+                    "current_price": None,
+                    "price_currency": "USD",
+                    "price_as_of": "2026-05-07",
+                    "data_quality_score": 100,
+                },
+            )
+        )
+        codes = {issue.code for issue in result.blocking_issues}
+        assert {
+            "STALE_MARKET_DATA",
+            "CURRENT_PRICE_MISMATCH",
+            "RESEARCH_ONLY_ACTION_CONFLICT",
+            "UNSUPPORTED_DECISION_INPUT",
+            "FUNDAMENTAL_EVIDENCE_MISSING",
+            "UNVERIFIED_LESSON_HISTORY",
+            "FALSE_BEARISH_DIVERGENCE_CLAIM",
+            "UNSUPPORTED_VOLUME_INFERENCE",
+            "UNSUPPORTED_STREAK_CLAIM",
+            "VALUATION_METHOD_MISSING",
+            "UNSUPPORTED_DECISION_OVERRIDE",
+        }.issubset(codes)
 
 
 @pytest.mark.unit
@@ -402,7 +665,52 @@ class TestReportWriterValidation:
         assert dashboard_path.exists()
         dashboard = json.loads(dashboard_path.read_text(encoding="utf-8"))
         assert dashboard["recommendation"] == "INSUFFICIENT_EVIDENCE"
-        assert dashboard["action"] == "No current transaction"
+        assert dashboard["decision_status"] == "blocked"
+        assert dashboard["action"] == "NO_CURRENT_TRANSACTION"
+
+        evidence_path = tmp_path / "decision_evidence_bundle.json"
+        assert evidence_path.exists()
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        assert "report:final_trade_decision" in evidence["canonical_fact_ids"]
+
+        lessons_path = tmp_path / "validated_lessons.json"
+        assert lessons_path.exists()
+        assert json.loads(lessons_path.read_text(encoding="utf-8")) == []
+
+        verified_claims_path = tmp_path / "verified_claims.json"
+        rejected_claims_path = tmp_path / "rejected_claims.json"
+        assert verified_claims_path.exists()
+        assert rejected_claims_path.exists()
+        assert json.loads(verified_claims_path.read_text(encoding="utf-8")) == []
+        assert json.loads(rejected_claims_path.read_text(encoding="utf-8")) == []
+
+    def test_research_only_report_suppresses_directional_pm_decision(self, tmp_path):
+        state = _state(
+            final_trade_decision=(
+                "**Rating**: Underweight\n\n"
+                "**Executive Summary**: Reduce exposure based on incomplete evidence."
+            ),
+            risk_debate_state={
+                "aggressive_history": "",
+                "conservative_history": "",
+                "neutral_history": "",
+                "judge_decision": (
+                    "**Rating**: Underweight\n\n"
+                    "**Executive Summary**: Reduce exposure based on incomplete evidence."
+                ),
+            },
+        )
+
+        report_path = write_report_tree(state, "NVDA", tmp_path)
+        complete_report = report_path.read_text(encoding="utf-8")
+        published_decision = (tmp_path / "5_portfolio" / "decision.md").read_text(
+            encoding="utf-8"
+        )
+
+        assert "**Rating**: Insufficient Evidence" in complete_report
+        assert "**Action**: No current transaction" in complete_report
+        assert "**Rating**: Underweight" not in complete_report
+        assert "**Rating**: Underweight" not in published_decision
 
     def test_strict_validation_blocks_publication(self, tmp_path):
         with pytest.raises(ValueError, match="Report validation blocked publication"):
@@ -452,7 +760,8 @@ class TestDashboardModel:
         dashboard = build_dashboard_model(state, validation)
         assert validation.status == "research_only"
         assert dashboard.recommendation == "INSUFFICIENT_EVIDENCE"
-        assert dashboard.action == "No current transaction"
+        assert dashboard.decision_status == "blocked"
+        assert dashboard.action == "NO_CURRENT_TRANSACTION"
         assert dashboard.target_base is None
 
     def test_stale_market_data_dashboard_blocks_transaction(self):
@@ -477,7 +786,8 @@ class TestDashboardModel:
         dashboard = build_dashboard_model(state, validation)
         assert validation.status == "blocked"
         assert dashboard.recommendation == "INSUFFICIENT_EVIDENCE"
-        assert dashboard.action == "No current transaction"
+        assert dashboard.decision_status == "blocked"
+        assert dashboard.action == "NO_CURRENT_TRANSACTION"
 
 
 @pytest.mark.unit
@@ -546,6 +856,14 @@ class TestTechnicalValidationFunctions:
             indicator_low_2=38.10,
         )
 
+    def test_rsi_near_65_is_not_bearish_divergence(self):
+        assert not bearish_divergence(
+            price_high_1=400.62,
+            price_high_2=398.73,
+            indicator_high_1=60.31,
+            indicator_high_2=64.60,
+        )
+
     def test_macd_components_reconcile(self):
         assert macd_components_reconcile(macd_line=1.25, signal_line=0.75, histogram=0.5)
         assert not macd_components_reconcile(macd_line=1.25, signal_line=0.75, histogram=0.2)
@@ -580,7 +898,7 @@ class TestTechnicalReportValidation:
             _state(market_report="RSI shows a bullish divergence after the new low.")
         )
         assert result.status == "blocked"
-        assert any(issue.code == "FALSE_DIVERGENCE_CLAIM" for issue in result.blocking_issues)
+        assert any(issue.code == "FALSE_BULLISH_DIVERGENCE_CLAIM" for issue in result.blocking_issues)
 
     def test_bullish_divergence_claim_with_validated_metadata_passes(self):
         result = validate_final_state(
@@ -598,7 +916,7 @@ class TestTechnicalReportValidation:
                 },
             )
         )
-        assert not any(issue.code == "FALSE_DIVERGENCE_CLAIM" for issue in result.issues)
+        assert not any(issue.code == "FALSE_BULLISH_DIVERGENCE_CLAIM" for issue in result.issues)
 
     def test_macd_mismatch_blocks(self):
         result = validate_final_state(
@@ -655,14 +973,14 @@ class TestTechnicalReportValidation:
             )
         )
         assert result.status == "blocked"
-        assert any(issue.code == "FALSE_DIVERGENCE_CLAIM" for issue in result.blocking_issues)
+        assert any(issue.code == "FALSE_BULLISH_DIVERGENCE_CLAIM" for issue in result.blocking_issues)
 
     def test_risk_volume_inference_claim_blocks(self):
         result = validate_final_state(
             _state(
                 risk_debate_state={
                     "aggressive_history": "",
-                    "conservative_history": "Volume shows institutional accumulation.",
+                    "conservative_history": "Volume shows accumulation behavior.",
                     "neutral_history": "",
                     "judge_decision": "",
                 }

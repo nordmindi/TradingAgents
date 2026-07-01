@@ -15,6 +15,8 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.reporting import (
     finalize_validation_artifacts,
     generate_pdf_from_markdown,
+    write_claim_reports,
+    write_decision_evidence_report,
     write_dashboard_report,
     write_validation_report,
 )
@@ -255,6 +257,8 @@ def run_report_job(request: ReportRequest, job_id: str | None = None) -> ReportR
         report_dir.mkdir(parents=True, exist_ok=True)
         write_validation_report(report_dir, validation_result)
         write_dashboard_report(report_dir, dashboard_model)
+        write_decision_evidence_report(report_dir, final_state)
+        write_claim_reports(report_dir, final_state)
         codes = ", ".join(issue.code for issue in validation_result.blocking_issues)
         raise ValueError(f"Report validation blocked publication: {codes}")
     

@@ -10,12 +10,13 @@ from tradingagents.agents.utils.rating import parse_rating
 
 
 SAFE_RECOMMENDATION = "INSUFFICIENT_EVIDENCE"
-SAFE_ACTION = "No current transaction"
+SAFE_ACTION = "NO_CURRENT_TRANSACTION"
 ACTIONABLE_STATUSES = {"verified"}
 
 
 class DashboardModel(BaseModel):
     report_status: Literal["verified", "verified_with_warnings", "research_only", "blocked"]
+    decision_status: Literal["available", "blocked"] = "blocked"
     recommendation: str
     action: str
     target_low: Decimal | None = None
@@ -30,6 +31,7 @@ class DashboardModel(BaseModel):
     def pdf_metrics(self) -> dict[str, str]:
         return {
             "Status": self.report_status.replace("_", " ").title(),
+            "Decision Status": self.decision_status.replace("_", " ").title(),
             "Recommendation": self.recommendation,
             "Action": self.action,
             "Target": _format_target(self),
@@ -47,6 +49,7 @@ def build_dashboard_model(final_state: dict, validation_result: Any) -> Dashboar
 
     return DashboardModel(
         report_status=status,
+        decision_status=_decision_status_for_report_status(status),
         recommendation=recommendation,
         action=_action_for_status_and_rating(status, recommendation),
         target_base=target,
@@ -72,7 +75,7 @@ def validate_dashboard_consistency(final_state: dict) -> list[dict[str, str]]:
         if dashboard.get("recommendation") != SAFE_RECOMMENDATION:
             issues.append(
                 {
-                    "code": "DASHBOARD_UNSAFE_RECOMMENDATION",
+                    "code": "RESEARCH_ONLY_ACTION_CONFLICT",
                     "location": "dashboard_model.recommendation",
                     "message": (
                         "Blocked or research-only reports must publish "
@@ -83,7 +86,7 @@ def validate_dashboard_consistency(final_state: dict) -> list[dict[str, str]]:
         if dashboard.get("action") != SAFE_ACTION:
             issues.append(
                 {
-                    "code": "DASHBOARD_UNSAFE_ACTION",
+                    "code": "RESEARCH_ONLY_ACTION_CONFLICT",
                     "location": "dashboard_model.action",
                     "message": (
                         "Blocked or research-only reports must publish "
@@ -94,7 +97,7 @@ def validate_dashboard_consistency(final_state: dict) -> list[dict[str, str]]:
         if _decimal_or_none(dashboard.get("target_base")) is not None:
             issues.append(
                 {
-                    "code": "DASHBOARD_UNSAFE_TARGET",
+                    "code": "RESEARCH_ONLY_ACTION_CONFLICT",
                     "location": "dashboard_model.target_base",
                     "message": "Blocked or research-only reports must not publish a dashboard target.",
                 }
@@ -164,6 +167,10 @@ def _recommendation_for_status(status: str, final_decision: str) -> str:
 
 def _status_allows_action(status: str) -> bool:
     return status in ACTIONABLE_STATUSES
+
+
+def _decision_status_for_report_status(status: str) -> str:
+    return "available" if _status_allows_action(status) else "blocked"
 
 
 def _data_quality_score(final_state: dict, validation_result: Any) -> int:
